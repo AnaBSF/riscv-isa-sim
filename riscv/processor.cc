@@ -41,6 +41,7 @@ processor_t::processor_t(const isa_parser_t *isa, const cfg_t *cfg,
   last_pc(1), executions(1), TM(cfg->trigger_count)
 {
   VU.p = this;
+  SU.p = this; // UVE
   TM.proc = this;
 
 #ifndef HAVE_INT128

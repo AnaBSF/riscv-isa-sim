@@ -53,7 +53,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #if defined(__cplusplus) && !defined(__APPLE__)
 # define THREAD_LOCAL thread_local
 #else
-# define THREAD_LOCAL _Thread_local
+#ifdef __cplusplus
+#define THREAD_LOCAL thread_local
+#else
+#define THREAD_LOCAL _Thread_local
+#endif
 #endif
 
 #ifdef __cplusplus

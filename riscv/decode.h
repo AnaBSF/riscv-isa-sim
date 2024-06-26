@@ -22,6 +22,8 @@ typedef float128_t freg_t;
 const int NXPR = 32;
 const int NFPR = 32;
 const int NVPR = 32;
+const int NUPR = 32; // UVE vector registers
+const int NPR = 16;  // UVE predicate registers
 const int NCSR = 4096;
 
 #define X_RA 1
@@ -148,6 +150,33 @@ public:
   uint64_t p_imm4() { return x(20, 4); }
   uint64_t p_imm5() { return x(20, 5); }
   uint64_t p_imm6() { return x(20, 6); }
+
+  /*=== UVE ===*/
+  uint64_t uve_rd() { return x(7, 5); }
+  int64_t uve_rs1() { return x(15, 5); }
+  int64_t uve_rs2() { return x(20, 5); }
+  int64_t uve_rs3() { return x(27, 5); }
+  uint64_t uve_pred() { return x(25, 3); }
+  uint64_t uve_v_pred() { return x(20, 3); } // Vector manipulation instructions
+  // Registers for load/store instructions
+  uint64_t uve_conf_base() { return x(15, 5); } // RS1
+  int64_t uve_conf_size() { return x(20, 5); } // RS2
+  int64_t uve_conf_stride() { return x(27, 5); } // RS3
+  // Registers for modifier configuration instructions
+  int64_t uve_mod_size() { return x(15, 5); } // RS1
+  int64_t uve_mod_disp() { return x(27, 5); } // RS3
+  // Registers for dynamic modifier configuration instructions
+  int64_t uve_mod_origin() { return x(15, 5); } // RS1
+  // Registers for branching instructions
+  int64_t uve_branch_rs() { return x(15, 5); } // RS1
+  // Calculate offset for UVE branching instruction
+  //int64_t uve_branch_imm() { return (x(8, 4) << 1) + (x(22, 6) << 5) + (x(7, 1) << 11) + (imm_sign() << 12); }
+  int64_t uve_branch_imm() { return (x(8, 4) << 1) + (x(22, 6) << 5) + (x(7, 1) << 11) + ( xs(28, 1) << 12); }
+  // Registers for predicate instructions
+  uint64_t uve_pred_rd() { return x(7, 4); }  // RD
+  int64_t uve_pred_rs1() { return x(15, 4); } // Source: predicate register
+  int64_t uve_pred_vs1() { return x(15, 5); } // Source: vector register
+  int64_t uve_pred_rs2() { return x(20, 5); }
 
   uint64_t zcmp_regmask() {
     unsigned mask = 0;

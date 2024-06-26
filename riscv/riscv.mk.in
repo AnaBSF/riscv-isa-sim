@@ -44,6 +44,9 @@ riscv_install_hdrs = \
 	trap.h \
 	triggers.h \
 	vector_unit.h \
+	descriptors.h \
+	streaming_unit.h \
+	helpers.h \
 
 riscv_precompiled_hdrs = \
 	insn_template.h \
@@ -70,6 +73,8 @@ riscv_srcs = \
 	csrs.cc \
 	triggers.cc \
 	vector_unit.cc \
+	descriptors.cc \
+	streaming_unit.cc \
 	socketif.cc \
 	cfg.cc \
 	$(riscv_gen_srcs) \
@@ -1091,6 +1096,169 @@ riscv_insn_ext_zvk = \
 	$(riscv_insn_ext_zvksed) \
 	$(riscv_insn_ext_zvksh) \
 
+riscv_insn_ext_uve = \
+	so_a_abs_fp \
+	so_a_abs_sg \
+	so_a_add_fp \
+	so_a_add_sg \
+	so_a_add_us \
+	so_a_adde_fp \
+	so_a_adde_sg \
+	so_a_adde_us \
+	so_a_adde_acc_fp \
+	so_a_adde_acc_sg \
+	so_a_adde_acc_us \
+	so_a_adds_fp \
+	so_a_adds_sg \
+	so_a_adds_us \
+	so_a_adds_acc_fp \
+	so_a_adds_acc_sg \
+	so_a_adds_acc_us \
+	so_a_div_fp \
+	so_a_div_sg \
+	so_a_div_us \
+	so_a_dec_fp \
+	so_a_dec_sg \
+	so_a_dec_us \
+	so_a_inc_fp \
+	so_a_inc_sg \
+	so_a_inc_us \
+	so_a_mac_fp \
+	so_a_mac_sg \
+	so_a_mac_us \
+	so_a_max_fp \
+	so_a_max_sg \
+	so_a_max_us \
+	so_a_maxe_fp \
+	so_a_maxe_sg \
+	so_a_maxe_us \
+	so_a_min_fp \
+	so_a_min_sg \
+	so_a_min_us \
+	so_a_mine_fp \
+	so_a_mine_sg \
+	so_a_mine_us \
+	so_a_mul_fp \
+	so_a_mul_sg \
+	so_a_mul_us \
+	so_a_sub_fp \
+	so_a_sub_sg \
+	so_a_sub_us \
+	so_a_and \
+	so_a_nand \
+	so_a_nor \
+	so_a_not \
+	so_a_sll \
+	so_a_slls \
+	so_a_sra \
+	so_a_sras \
+	so_a_srl \
+	so_a_srls \
+	so_a_xor \
+	so_b_c \
+	so_b_dc_1 \
+	so_b_dc_2 \
+	so_b_dc_3 \
+	so_b_dc_4 \
+	so_b_dc_5 \
+	so_b_dc_6 \
+	so_b_dc_7 \
+	so_b_nc \
+	so_b_ndc_1 \
+	so_b_ndc_2 \
+	so_b_ndc_3 \
+	so_b_ndc_4 \
+	so_b_ndc_5 \
+	so_b_ndc_6 \
+	so_b_ndc_7 \
+	so_p_ge_fp \
+	so_p_eq_fp \
+	so_p_lt_fp \
+	so_p_ge_sg \
+	so_p_eq_sg \
+	so_p_lt_sg \
+	so_p_ge_us \
+	so_p_eq_us \
+	so_p_lt_us \
+	so_p_mv \
+	so_p_mvt \
+	so_p_not \
+	so_p_one \
+	so_p_vr \
+	so_p_zero \
+	so_v_dp_b \
+	so_v_dp_d \
+	so_v_dp_h \
+	so_v_dp_w \
+	so_v_mv \
+	so_v_mvt \
+	so_v_mvsv_b \
+	so_v_mvsv_h \
+	so_v_mvsv_w \
+	so_v_mvsv_d \
+	so_v_mvvs \
+	ss_app \
+	ss_end \
+	ss_app_ind_ofs_add_1 \
+	ss_app_ind_ofs_dec_1 \
+	ss_app_ind_ofs_inc_1 \
+	ss_app_ind_ofs_set_1 \
+	ss_app_ind_ofs_sub_1 \
+	ss_app_ind_ofs_sg_add \
+	ss_app_ind_ofs_sg_dec \
+	ss_app_ind_ofs_sg_inc \
+	ss_app_ind_ofs_sg_set \
+	ss_app_ind_ofs_sg_sub \
+	ss_app_ind_siz_add_1 \
+	ss_app_ind_siz_dec_1 \
+	ss_app_ind_siz_inc_1 \
+	ss_app_ind_siz_set_1 \
+	ss_app_ind_siz_sub_1 \
+	ss_app_ind_str_add_1 \
+	ss_app_ind_str_dec_1 \
+	ss_app_ind_str_inc_1 \
+	ss_app_ind_str_set_1 \
+	ss_app_ind_str_sub_1 \
+	ss_app_mod_ofs_dec_1 \
+	ss_app_mod_ofs_inc_1 \
+	ss_app_mod_siz_dec_1 \
+	ss_app_mod_siz_inc_1 \
+	ss_app_mod_str_dec_1 \
+	ss_app_mod_str_inc_1 \
+	ss_end_ind_ofs_sg_add \
+	ss_end_ind_ofs_sg_dec \
+	ss_end_ind_ofs_sg_inc \
+	ss_end_ind_ofs_sg_set \
+	ss_end_ind_ofs_sg_sub \
+	ss_sta_ld_b \
+	ss_sta_ld_d \
+	ss_sta_ld_h \
+	ss_sta_ld_w \
+	ss_sta_ld_b_inds \
+	ss_sta_ld_d_inds \
+	ss_sta_ld_h_inds \
+	ss_sta_ld_w_inds \
+	ss_sta_ld_b_v \
+	ss_sta_ld_d_v \
+	ss_sta_ld_h_v \
+	ss_sta_ld_w_v \
+	ss_sta_ld_b_v_1 \
+	ss_sta_ld_d_v_1 \
+	ss_sta_ld_h_v_1 \
+	ss_sta_ld_w_v_1 \
+	ss_sta_st_b \
+	ss_sta_st_d \
+	ss_sta_st_h \
+	ss_sta_st_w \
+	ss_sta_st_b_v \
+	ss_sta_st_d_v \
+	ss_sta_st_h_v \
+	ss_sta_st_w_v \
+	ss_sta_st_b_v_1 \
+	ss_sta_st_d_v_1 \
+	ss_sta_st_h_v_1 \
+	ss_sta_st_w_v_1 \
+
 riscv_insn_list = \
 	$(riscv_insn_ext_i) \
 	$(riscv_insn_ext_c) \
@@ -1108,6 +1276,7 @@ riscv_insn_list = \
 	$(riscv_insn_ext_k) \
 	$(riscv_insn_ext_q) \
 	$(riscv_insn_ext_q_zfa) \
+	$(riscv_insn_ext_uve) \
 	$(riscv_insn_ext_zacas) \
 	$(riscv_insn_ext_zabha) \
 	$(riscv_insn_ext_zawrs) \
