@@ -1246,6 +1246,10 @@ riscv_insn_ext_uve = \
 	ss_sta_ld_d_v_1 \
 	ss_sta_ld_h_v_1 \
 	ss_sta_ld_w_v_1 \
+	ss_sta_ld_b_v_2 \
+	ss_sta_ld_d_v_2 \
+	ss_sta_ld_h_v_2 \
+	ss_sta_ld_w_v_2 \
 	ss_sta_st_b \
 	ss_sta_st_d \
 	ss_sta_st_h \
@@ -1258,6 +1262,10 @@ riscv_insn_ext_uve = \
 	ss_sta_st_d_v_1 \
 	ss_sta_st_h_v_1 \
 	ss_sta_st_w_v_1 \
+	ss_sta_st_b_v_2 \
+	ss_sta_st_d_v_2 \
+	ss_sta_st_h_v_2 \
+	ss_sta_st_w_v_2 \
 
 riscv_insn_list = \
 	$(riscv_insn_ext_i) \
