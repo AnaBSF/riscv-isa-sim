@@ -317,6 +317,14 @@ void streamRegister_t<T>::updateIteration() {
 
         if (currDim.isEndOfDimension()){
 
+            // If modifiers exist, the values at targetted dimensions might have been modified.
+            // As such, we need to reset them before next iteration.
+            auto currentModifierIters = staticModifiers.equal_range(i);
+            for (auto it = currentModifierIters.first; it != currentModifierIters.second; ++it) {
+                int target = it->second.getTargetDim();
+                dimensions.at(target).resetIterValues();
+            }
+
             auto &nextDim = dimensions.at(i + 1);
 
             // Reset EOD flag of current dimension
@@ -335,14 +343,6 @@ void streamRegister_t<T>::updateIteration() {
             auto upperModifierIters = staticModifiers.equal_range(i+1);
             for (auto it = upperModifierIters.first; it != upperModifierIters.second; ++it) {
                 it->second.modDimension(dimensions, elementWidth);
-            }
-
-            // If modifiers exist, the values at targetted dimensions might have been modified.
-            // As such, we need to reset them before next iteration.
-            auto currentModifierIters = staticModifiers.equal_range(i);
-            for (auto it = currentModifierIters.first; it != currentModifierIters.second; ++it) {
-                int target = it->second.getTargetDim();
-                dimensions.at(target).resetIterValues();
             }
         }
     }
