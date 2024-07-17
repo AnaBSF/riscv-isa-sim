@@ -15,6 +15,7 @@ class streamingUnit_t;
 
 enum class RegisterConfig { NoStream,
                             Load,
+                            IndSource,
                             Store };
 enum class RegisterStatus { NotConfigured,
                             Running,
@@ -62,6 +63,7 @@ struct streamRegister_t {
         mode = RegisterMode::Vector;
         validElements = vLen;
         vecCfgDim = -1;
+        baseAddress = 0;
     }
 
     void addStaticModifier(staticModifier_t mod);
@@ -69,7 +71,7 @@ struct streamRegister_t {
     void addScatterGModifier(scatterGModifier_t mod);
     void addDimension(dimension_t dim);
     void configureVecDim(const int = -1);
-    void startConfiguration(dimension_t dim);
+    void startConfiguration(size_t base_address);
     void endConfiguration();
     std::vector<ElementsType> getElements(bool causesUpdate = true);
     bool getDynModElement(int &value);
@@ -115,11 +117,13 @@ private:
     is controlled using the instruction ss_cfg_vec */
     int vecCfgDim;
 
+    size_t baseAddress;
+
     size_t generateAddress();
     bool isDimensionFullyDone(const std::deque<dimension_t>::const_iterator start, const std::deque<dimension_t>::const_iterator end) const;
     bool isStreamDone() const;
     bool tryGenerateAddress(size_t &address);
-    void applyDynamicMods(size_t dimN);
+    void applySGMods(size_t dimN);
     void setDynamicModsNotApplied(size_t dimN);
     void setSGModsNotApplied(size_t dimN);
     void updateIteration();

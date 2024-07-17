@@ -91,13 +91,14 @@ void dynamicModifier_t::calculateValueChange(auto &target, auto baseValue, dynam
 void dynamicModifier_t::getIndirectRegisterValues() {
     auto &src = (su->registers).at(sourceStream);
     std::visit(overloaded{
-                   [&](auto &reg) { sourceEnd = !reg.getDynModElement(indirectRegisterValue); }},
+                   [&](auto &reg) { sourceEnd = !reg.getDynModElement(indirectRegisterValue); 
+                   //std::cout << "u" << reg.registerN << "   Getting dyn el\n";
+                   }},
                src);
-
-    /*print values
-    for (auto &v : indirectRegisterValues) {
-        printf("value: %d\n", v);
-    }*/
+    /*if (sourceEnd)
+        std::cout << "sourceEnd\n";*/
+    //print value
+    //std::cout << "indirectRegisterValue: " << indirectRegisterValue << std::endl;
 }
 
 void dynamicModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t elementWidth) {
@@ -127,6 +128,7 @@ void dynamicModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t
     } else {
         dim.setEndOfDimension(true);
         sourceEnd = false;
+        //std::cout << "ACABOU\n";
     }
 }
 
@@ -155,13 +157,13 @@ void scatterGModifier_t::calculateValueChange(auto &target, auto baseValue, dyna
 void scatterGModifier_t::getIndirectRegisterValues() {
     auto &src = (su->registers).at(sourceStream);
     std::visit(overloaded{
-                   [&](auto &reg) { sourceEnd = !reg.getDynModElement(indirectRegisterValue); }},
+                   [&](auto &reg) { sourceEnd = !reg.getDynModElement(indirectRegisterValue);
+                   //std::cout << "u" << reg.registerN << "   Getting dyn el\n";
+                   }},
                src);
 
-    /*print values
-    for (auto &v : indirectRegisterValues) {
-        printf("value: %d\n", v);
-    }*/
+    //print value
+    //std::cout << "sgRegisterValue: " << indirectRegisterValue << std::endl;
 }
 
 void scatterGModifier_t::modDimension(dimension_t &dim, const size_t elementWidth) {
@@ -187,6 +189,7 @@ void scatterGModifier_t::modDimension(dimension_t &dim, const size_t elementWidt
     } else {
         dim.setEndOfDimension(true);
         sourceEnd = false;
+        //std::cout << "ACABOU sg\n";
     }
 }
 

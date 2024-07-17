@@ -88,21 +88,40 @@ void streamRegister_t<T>::configureVecDim(const int cfgIndex) {
 }
 
 template <typename T>
-void streamRegister_t<T>::startConfiguration(dimension_t dim) {
+void streamRegister_t<T>::startConfiguration(size_t base_address) {
     status = RegisterStatus::NotConfigured;
     mode = RegisterMode::Scalar;
     validElements = 1;
+    baseAddress = base_address;
     dimensions.clear();
-    dimensions.push_back(dim);
 }
 
 template <typename T>
 void streamRegister_t<T>::endConfiguration() {
     status = RegisterStatus::Running;
+
+    // Apply all dynamic modifiers for the first iteration
+    for (size_t i = 0; i < dimensions.size(); i++) {
+        //std::cout << "u" << registerN << "    Applying dynamic modifiers to dim " << i << std::endl;
+        auto dynamicModifierIters = dynamicModifiers.equal_range(i);
+        for (auto it = dynamicModifierIters.first; it != dynamicModifierIters.second; ++it) {
+            //std::cout << "u" << registerN << "    Applying dynamic modifier to dim " << i << std::endl;
+            it->second.modDimension(dimensions, elementWidth);
+        }
+    }
+    //print scatter-gather modifiers if registerN == 4
+    /*if (registerN == 4) {
+        std::cout << "u" << registerN << "    Scatter-Gather Modifiers: ";
+        for (auto &m : scatterGModifiers)
+            std::cout << m.first << "  ";
+        std::cout << std::endl;
+    }*/
+
 }
 
 template <typename T>
 std::vector<T> streamRegister_t<T>::getElements(bool causesUpdate) {
+    //std::cout << "u" << registerN << "    Getting elements" << std::endl;
     if (causesUpdate && this->type == RegisterConfig::Load)
         updateAsLoad();
 
@@ -113,9 +132,9 @@ std::vector<T> streamRegister_t<T>::getElements(bool causesUpdate) {
 
 template <typename T>
 bool streamRegister_t<T>::getDynModElement(int &value) {
-    mode = RegisterMode::Scalar;
-    validElements = 1;
-    assert_msg("Dynamic modifier source is not correctly configured", this->type == RegisterConfig::Load);
+    //assert_msg("Dynamic modifier source is not correctly configured", type == RegisterConfig::IndSource);
+
+    //std::cout << "u" << registerN << "    Getting modifier element" << std::endl;
 
     updateAsLoad();
 
@@ -128,11 +147,13 @@ bool streamRegister_t<T>::getDynModElement(int &value) {
     }
 
     return 1;
+
+    //return hasStreamFinished();
 }
 
 template <typename T>
 void streamRegister_t<T>::setElements(std::vector<T> e, bool causesUpdate) {
-    assert_msg("Trying to set values to a load stream", type != RegisterConfig::Load);
+    assert_msg("Trying to set values to a load stream", type != RegisterConfig::Load && type != RegisterConfig::IndSource);
 
     elements = e;
 
@@ -211,7 +232,7 @@ void streamRegister_t<T>::printRegN(char *str) {
 template <typename T>
 size_t streamRegister_t<T>::generateAddress() {
     /* Result will be the final accumulation of all offsets calculated per dimension */
-    size_t init = 0;
+    size_t init = baseAddress; // base address of the stream
     int dimN = 0;
 
     return std::accumulate(dimensions.begin(), dimensions.end(), init, [&](size_t acc, dimension_t &dim) {
@@ -247,18 +268,16 @@ bool streamRegister_t<T>::tryGenerateAddress(size_t &address) {
     /* The outermost dimension is the last one in the container */
 
     if (isStreamDone()) {
-        /*if(registerN == 2)
-		    std:: cout << "u" << registerN << "    Stream is done" << std::endl;*/
+        /*if (registerN == 3 || registerN == 7)
+            std::cout << "u" << registerN << " Stream is done HERE GENERATE" << std::endl;*/
         status = RegisterStatus::Finished;
         type = RegisterConfig::NoStream;
         return false;
     }
 
-    for (int i = 0; i < int(dimensions.size()) - 1; i++) {
-        applyDynamicMods(i);
+    for (int i = 0; i < int(dimensions.size()); i++) {
+        applySGMods(i);
         if (i == vecCfgDim && isDimensionFullyDone(dimensions.begin(), dimensions.begin() + i + 1)) {
-            /*if(registerN == 2)
-                std::cout << "u" << registerN << "    Stop dimension loading " << i << std::endl;*/
             return false;
         }
     }
@@ -267,14 +286,7 @@ bool streamRegister_t<T>::tryGenerateAddress(size_t &address) {
 }
 
 template <typename T>
-void streamRegister_t<T>::applyDynamicMods(size_t dimN) {
-    auto currentModifierIters = dynamicModifiers.equal_range(dimN);
-    for (auto it = currentModifierIters.first; it != currentModifierIters.second; ++it) {
-        if (!it->second.isApplied()){
-            //std::cout << "u" << registerN << "    Applying dynamic modifier to dim " << dimN << std::endl;
-            it->second.modDimension(dimensions, elementWidth);
-        }
-    }
+void streamRegister_t<T>::applySGMods(size_t dimN) {
     auto currentModifierIters1 = scatterGModifiers.equal_range(dimN);
     for (auto it = currentModifierIters1.first; it != currentModifierIters1.second; ++it) {
         if (!it->second.isApplied()){
@@ -303,13 +315,16 @@ void streamRegister_t<T>::updateIteration() {
     if (isStreamDone()) {
         status = RegisterStatus::Finished;
         type = RegisterConfig::NoStream;
+        /*if (registerN == 3 || registerN == 7) 
+            std::cout << "u" << registerN << " Stream is done HERE ITER" << std::endl;*/
         return;
     }
 
     /* Iteration starts from the innermost dimension and updates the next if the current reaches an overflow */
     dimensions.at(0).advance();
+    //std::cout << "u" << registerN << ": Updating iteration. Dimension 1\n";
 
-    // std::cout << "Updating iteration. Dimensions: " << dimensions.size() << std::endl;
+    //std::cout << registerN << ": Updating iteration. Dimensions: " << dimensions.size() << std::endl;
     for (size_t i = 0; i < dimensions.size() - 1; ++i) {
         auto &currDim = dimensions.at(i);
         /* The following calculations are only necessary if we ARE in the
@@ -319,10 +334,18 @@ void streamRegister_t<T>::updateIteration() {
 
             // If modifiers exist, the values at targetted dimensions might have been modified.
             // As such, we need to reset them before next iteration.
+            
             auto currentModifierIters = staticModifiers.equal_range(i);
             for (auto it = currentModifierIters.first; it != currentModifierIters.second; ++it) {
                 int target = it->second.getTargetDim();
                 dimensions.at(target).resetIterValues();
+            }
+            // If dynamic modifiers exist, we also need to apply them before the first iteration of the target dimension.
+            auto currentDynaminModifierIters = dynamicModifiers.equal_range(i);
+            for (auto it = currentDynaminModifierIters.first; it != currentDynaminModifierIters.second; ++it) {
+                int target = it->second.getTargetDim();
+                dimensions.at(target).resetIterValues();
+                it->second.modDimension(dimensions, elementWidth);
             }
 
             auto &nextDim = dimensions.at(i + 1);
@@ -331,29 +354,38 @@ void streamRegister_t<T>::updateIteration() {
             currDim.setEndOfDimension(false);
 
             // Unflag dynamic modifiers of current dimension
-            setDynamicModsNotApplied(i);
+            //setDynamicModsNotApplied(i);
 
             // Iterate upper dimension
             nextDim.advance();
+            //std::cout << "u" << registerN << ": Updating iteration. Dimension " << i+2 << "\n";
 
-            // Unflag scatter dynamic modifiers of upper  dimension
-            setSGModsNotApplied(i+1);
+            // Unflag scatter dynamic modifiers of upper dimension
+            //setSGModsNotApplied(i+1);
 
             // Apply static modifiers associated with upper dimension to target dimensions
             auto upperModifierIters = staticModifiers.equal_range(i+1);
             for (auto it = upperModifierIters.first; it != upperModifierIters.second; ++it) {
                 it->second.modDimension(dimensions, elementWidth);
             }
+
+            // Apply dynamic modifiers associated with upper dimension to target dimensions
+            auto upperDynamicModifierIters = dynamicModifiers.equal_range(i+1);
+            for (auto it = upperDynamicModifierIters.first; it != upperDynamicModifierIters.second; ++it) {
+                it->second.modDimension(dimensions, elementWidth);
+            } 
         }
     }
 }
 
 template <typename T>
 void streamRegister_t<T>::updateAsLoad() {
-    assert_msg("Trying to update as load a non-load stream", type == RegisterConfig::Load);
+    assert_msg("Trying to update as load a non-load stream", type == RegisterConfig::Load || type == RegisterConfig::IndSource);
     if (isStreamDone()) { // doesn't try to load if stream has finished
         status = RegisterStatus::Finished;
         type = RegisterConfig::NoStream;
+        /*if (registerN == 3 || registerN == 7) 
+            std::cout << "u" << registerN << " Stream is done HERE LOAD" << std::endl;*/
         return;
     }
 
@@ -395,12 +427,12 @@ void streamRegister_t<T>::updateAsLoad() {
         }(offset);
 
         // elements.push_back(value);
-        // std::cout << "u"<< registerN << "   Loaded Value: " << readAS<double>(value) << std::endl;
+        //std::cout << "u"<< registerN << "   Loaded Value." << std::endl;
         elements.at(eCount) = value;
         /*if (registerN==2)
             std::cout << "u" << registerN << "    Loaded Value: " << readAS<int>(value) << std::endl;*/
         ++validElements;
-        for (size_t i = 0; i < dimensions.size() - 1; i++)
+        for (size_t i = 0; i < dimensions.size(); i++)
             setSGModsNotApplied(i);
         if (tryGenerateAddress(offset)) {
             updateIteration(); // reset EOD flags and iterate stream
@@ -410,8 +442,8 @@ void streamRegister_t<T>::updateAsLoad() {
 		}
     }
     su->updateEODTable(registerN); // save current state of the stream so that branches can catch EOD flags
-    // std::cout << "eCount: " << eCount << std::endl;
-    // std::cout << "vLen: " << vLen << std::endl;
+    //std::cout << "eCount: " << eCount << std::endl;
+    //std::cout << "vLen: " << vLen << std::endl;
     if (eCount < max) {      // iteration is already updated when register is full
         updateIteration(); // reset EOD flags and iterate stream
         /*for (size_t i = 0; i < dimensions.size() - 1; i++)
