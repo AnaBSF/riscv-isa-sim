@@ -110,12 +110,14 @@ void dynamicModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t
         if (target == Target::Offset) {
             calculateValueChange(dim.iter_offset, dim.offset, behaviour, indirectRegisterValue * elementWidth);
             dim.setEndOfDimension(false);
-            // std::cout << "iter_offset: " << dim.iter_offset << std::endl;
+            std::cout << "dyn offset: " << indirectRegisterValue << std::endl;
         } else if (target == Target::Size) {
             calculateValueChange(dim.iter_size, dim.size, behaviour, indirectRegisterValue);
-            if (dim.iter_size)
+            if (dim.iter_size){
                 dim.setEndOfDimension(false);
-            // std::cout << "iter_size: " << dim.iter_size << std::endl;
+                //std::cout << "REMOVING EOD\n";
+            }
+            //std::cout << "iter_size: " << dim.iter_size << std::endl;
         } else if (target == Target::Stride) {
             calculateValueChange(dim.iter_stride, dim.stride, behaviour, indirectRegisterValue);
             // std::cout << "iter_stride: " << dim.iter_stride << std::endl;
@@ -172,23 +174,23 @@ void scatterGModifier_t::modDimension(dimension_t &dim, const size_t elementWidt
         getIndirectRegisterValues();
 
         calculateValueChange(dim.iter_offset, dim.offset, behaviour, indirectRegisterValue * elementWidth);
-        dim.setEndOfDimension(false);
+        //dim.setEndOfDimension(false);
 
-        if (behaviour != dynamicBehaviour::Increment && behaviour != dynamicBehaviour::Decrement)
-            dim.iter_size = UINT_MAX;
+        /*if (behaviour != dynamicBehaviour::Increment && behaviour != dynamicBehaviour::Decrement)
+            dim.iter_size = UINT_MAX;*/
         /* print dimension
-        std::cout << "dimension_t: ";
-        std::cout << "offset: " << dim.iter_offset << ", ";
+        std::cout << "SG dimension_t: ";
+        std::cout << "offset: " << dim.iter_offset << std::endl;
         std::cout << "size: " << dim.iter_size << ", ";
         std::cout << "stride: " << dim.iter_stride << ", ";
-        std::cout << "EOD: " << (int)dim.endOfDimension << std::endl;*/
-        // std::cout << "iter_offset: " << dim.iter_offset << std::endl;
+        std::cout << "EOD: " << (int)dim.endOfDimension << std::endl;
+        std::cout << "iter_offset: " << dim.iter_offset << std::endl;*/
 
         modApplied = true;
 
     } else {
         dim.setEndOfDimension(true);
-        sourceEnd = false;
+        //sourceEnd = false;
         //std::cout << "ACABOU sg\n";
     }
 }
