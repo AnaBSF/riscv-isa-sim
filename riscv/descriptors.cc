@@ -109,7 +109,7 @@ void dynamicModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t
 
         if (target == Target::Offset) {
             calculateValueChange(dim.iter_offset, dim.offset, behaviour, indirectRegisterValue * elementWidth);
-            dim.setEndOfDimension(false);
+            //dim.setEndOfDimension(false);
             std::cout << "dyn offset: " << indirectRegisterValue << std::endl;
         } else if (target == Target::Size) {
             calculateValueChange(dim.iter_size, dim.size, behaviour, indirectRegisterValue);

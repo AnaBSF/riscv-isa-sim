@@ -320,6 +320,9 @@ void streamRegister_t<T>::updateIteration() {
 
     /* Iteration starts from the innermost dimension and updates the next if the current reaches an overflow */
     dimensions.at(0).advance();
+    if (registerN == 3) {
+        std::cout << "u" << registerN << ": Updating iteration. Dimension 1" << std::endl;
+    }
     //std::cout << "u" << registerN << ": Updating iteration. Dimension 1\n";
 
     //std::cout << registerN << ": Updating iteration. Dimensions: " << dimensions.size() << std::endl;
@@ -339,12 +342,15 @@ void streamRegister_t<T>::updateIteration() {
                 dimensions.at(target).resetIterValues();
             }
             // If dynamic modifiers exist, we also need to apply them before the first iteration of the target dimension.
-            auto currentDynaminModifierIters = dynamicModifiers.equal_range(i);
+            /*auto currentDynaminModifierIters = dynamicModifiers.equal_range(i);
             for (auto it = currentDynaminModifierIters.first; it != currentDynaminModifierIters.second; ++it) {
                 int target = it->second.getTargetDim();
                 dimensions.at(target).resetIterValues();
+                if (registerN == 3) {
+                    std::cout << "u" << registerN << "   Dim "<< i+1 << " ended: Applying dynamic modifier to dim " << target << std::endl;
+                }
                 it->second.modDimension(dimensions, elementWidth);
-            }
+            }*/
 
             auto &nextDim = dimensions.at(i + 1);
 
@@ -356,6 +362,9 @@ void streamRegister_t<T>::updateIteration() {
 
             // Iterate upper dimension
             nextDim.advance();
+            if ( registerN == 3) {
+                std::cout << "u" << registerN << ": Updating iteration. Dimension " << i+2 << std::endl;
+            }
             //std::cout << "u" << registerN << ": Updating iteration. Dimension " << i+2 << "\n";
 
             // Unflag scatter dynamic modifiers of upper dimension
@@ -370,6 +379,12 @@ void streamRegister_t<T>::updateIteration() {
             // Apply dynamic modifiers associated with upper dimension to target dimensions
             auto upperDynamicModifierIters = dynamicModifiers.equal_range(i+1);
             for (auto it = upperDynamicModifierIters.first; it != upperDynamicModifierIters.second; ++it) {
+                int target = it->second.getTargetDim();
+                if (registerN == 3) {
+                    std::cout << "u" << registerN << ": Applying dynamic modifier to dim " << target << std::endl;
+                }
+                if (nextDim.isLastIteration())
+                    nextDim.resetIterValues();
                 it->second.modDimension(dimensions, elementWidth);
             } 
         }
