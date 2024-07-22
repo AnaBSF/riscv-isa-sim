@@ -320,9 +320,9 @@ void streamRegister_t<T>::updateIteration() {
 
     /* Iteration starts from the innermost dimension and updates the next if the current reaches an overflow */
     dimensions.at(0).advance();
-    if (registerN == 3) {
+    /*if (registerN == 3) {
         std::cout << "u" << registerN << ": Updating iteration. Dimension 1" << std::endl;
-    }
+    }*/
     //std::cout << "u" << registerN << ": Updating iteration. Dimension 1\n";
 
     //std::cout << registerN << ": Updating iteration. Dimensions: " << dimensions.size() << std::endl;
@@ -362,9 +362,9 @@ void streamRegister_t<T>::updateIteration() {
 
             // Iterate upper dimension
             nextDim.advance();
-            if ( registerN == 3) {
+            /*if ( registerN == 3) {
                 std::cout << "u" << registerN << ": Updating iteration. Dimension " << i+2 << std::endl;
-            }
+            }*/
             //std::cout << "u" << registerN << ": Updating iteration. Dimension " << i+2 << "\n";
 
             // Unflag scatter dynamic modifiers of upper dimension
@@ -380,9 +380,9 @@ void streamRegister_t<T>::updateIteration() {
             auto upperDynamicModifierIters = dynamicModifiers.equal_range(i+1);
             for (auto it = upperDynamicModifierIters.first; it != upperDynamicModifierIters.second; ++it) {
                 int target = it->second.getTargetDim();
-                if (registerN == 3) {
+                /*if (registerN == 3) {
                     std::cout << "u" << registerN << ": Applying dynamic modifier to dim " << target << std::endl;
-                }
+                }*/
                 if (nextDim.isLastIteration())
                     nextDim.resetIterValues();
                 it->second.modDimension(dimensions, elementWidth);
