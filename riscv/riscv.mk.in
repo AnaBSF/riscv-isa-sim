@@ -1240,6 +1240,10 @@ riscv_insn_ext_uve = \
 	ss_sta_ld_d \
 	ss_sta_ld_h \
 	ss_sta_ld_w \
+	ss_sta_ld_b_m \
+	ss_sta_ld_d_m \
+	ss_sta_ld_h_m \
+	ss_sta_ld_w_m \
 	ss_sta_ld_b_inds \
 	ss_sta_ld_d_inds \
 	ss_sta_ld_h_inds \
@@ -1248,6 +1252,10 @@ riscv_insn_ext_uve = \
 	ss_sta_ld_d_v \
 	ss_sta_ld_h_v \
 	ss_sta_ld_w_v \
+	ss_sta_ld_b_v_m \
+	ss_sta_ld_d_v_m \
+	ss_sta_ld_h_v_m \
+	ss_sta_ld_w_v_m \
 	ss_sta_ld_b_v_1 \
 	ss_sta_ld_d_v_1 \
 	ss_sta_ld_h_v_1 \
@@ -1256,6 +1264,14 @@ riscv_insn_ext_uve = \
 	ss_sta_ld_d_v_2 \
 	ss_sta_ld_h_v_2 \
 	ss_sta_ld_w_v_2 \
+	ss_sta_ld_b_v_1_m \
+	ss_sta_ld_d_v_1_m \
+	ss_sta_ld_h_v_1_m \
+	ss_sta_ld_w_v_1_m \
+	ss_sta_ld_b_v_2_m \
+	ss_sta_ld_d_v_2_m \
+	ss_sta_ld_h_v_2_m \
+	ss_sta_ld_w_v_2_m \
 	ss_sta_st_b \
 	ss_sta_st_d \
 	ss_sta_st_h \

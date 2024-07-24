@@ -12,7 +12,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
      * operated on */
     assert_msg("Given vectors have different widths", src1.getElementWidth() == src2.getElementWidth());
     size_t vLen = src1.getMode() == RegisterMode::Scalar ||  src2.getMode() == RegisterMode::Scalar ? 1 : dest.getVLen();
-    bool zeroing = src1.getType() == RegisterConfig::Load || src2.getType() == RegisterConfig::Load;
+    bool zeroing = src1.getPredMode() == PredicateMode::Zeroing && src2.getPredMode() == PredicateMode::Zeroing;
 
     auto elements1 = src1.getElements();
     auto elements2 = src2.getElements();
@@ -32,8 +32,8 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
             if (pi.at((i + 1) * sizeof(OperationType) - 1)) {
                 OperationType e1 = readAS<OperationType>(elements1.at(i));
                 OperationType e2 = readAS<OperationType>(elements2.at(i));
-                auto e3 = readAS<OperationType>(destElements.at(i));
-                out.at(i) = readAS<StorageType>(e1 * e2 + e3);
+                OperationType e3 = readAS<OperationType>(destElements.at(i));
+                out.at(i) = readAS<StorageType>(OperationType(e1 * e2 + e3));
                 //std::cout << "MAC   e1: " << e1 << " e2: " << e2 << " e3: " << e3 << " result: " << readAS<OperationType>(out.at(i)) << std::endl;
             }
         } else if (zeroing)

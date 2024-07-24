@@ -178,6 +178,11 @@ void streamRegister_t<T>::setMode(const RegisterMode m) {
 }
 
 template <typename T>
+void streamRegister_t<T>::setPredMode(const PredicateMode pm) {
+    predMode = pm;
+}
+
+template <typename T>
 bool streamRegister_t<T>::hasStreamFinished() const {
     return status == RegisterStatus::Finished;
 }
@@ -216,6 +221,11 @@ RegisterConfig streamRegister_t<T>::getType() const {
 template <typename T>
 RegisterMode streamRegister_t<T>::getMode() const {
     return mode;
+}
+
+template <typename T>
+PredicateMode streamRegister_t<T>::getPredMode() const {
+    return predMode;
 }
 
 /* FOR DEBUGGING*/

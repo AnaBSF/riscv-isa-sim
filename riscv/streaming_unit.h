@@ -23,6 +23,9 @@ enum class RegisterStatus { NotConfigured,
 enum class RegisterMode { Vector,
                           Scalar };
 
+enum class PredicateMode { Zeroing,
+                           Merging };   
+
 /* T is one of std::uint8_t, std::uint16_t, std::uint32_t or std::uint64_t and
   represents the type of the elements of a stream at a given moment. It is the
   type configured to store a value at a given time */
@@ -61,6 +64,7 @@ struct streamRegister_t {
      registerN(regN), su(su), type(t) {
         status = RegisterStatus::NotConfigured;
         mode = RegisterMode::Vector;
+        predMode = PredicateMode::Zeroing;
         validElements = vLen;
         vecCfgDim = -1;
         baseAddress = 0;
@@ -78,6 +82,7 @@ struct streamRegister_t {
     void setElements(std::vector<ElementsType> e, bool causesUpdate = true);
     void setValidIndex(const size_t i);
     void setMode(const RegisterMode m);
+    void setPredMode(const PredicateMode pm);
     bool hasStreamFinished() const;
     //void clearEndOfDimensionOfDim(size_t i);
     bool isEndOfDimensionOfDim(size_t i) const;
@@ -89,6 +94,7 @@ struct streamRegister_t {
     RegisterConfig getType() const;
     RegisterStatus getStatus() const;
     RegisterMode getMode() const;
+    PredicateMode getPredMode() const;
 
     /* FOR DEBUGGING*/
     void printRegN(char *str = "");
@@ -112,6 +118,7 @@ private:
     RegisterConfig type;
     RegisterStatus status;
     RegisterMode mode;
+    PredicateMode predMode;
     /* This structure holds an array of bits indicating whether the corresponding dimension
     is configured to only load elements while the current dimension is not over or not. It
     is controlled using the instruction ss_cfg_vec */

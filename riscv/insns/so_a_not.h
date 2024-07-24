@@ -9,7 +9,7 @@ auto &predReg = P.SU.predicates[insn.uve_pred()];
 auto baseBehaviour = [](auto &dest, auto &src, auto &pred, auto extra) {
     /* We can only operate on the first available values of the stream */
     size_t vLen = src.getMode() == RegisterMode::Scalar ? 1 : dest.getVLen();
-bool zeroing = src.getType() == RegisterConfig::Load;
+bool zeroing = src.getPredMode() == PredicateMode::Zeroing;
     auto elements = src.getElements();
     auto destElements = dest.getElements(false);
     auto validElementsIndex = src.getValidElements();

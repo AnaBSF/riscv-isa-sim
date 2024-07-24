@@ -14,7 +14,7 @@ const uint64_t shiftValue = readRegAS(uint64_t, src2);
 auto baseBehaviour = [](auto &dest, auto &src, uint64_t shiftValue, auto &pred, auto extra) {
     /* We can only operate on the first available values of the stream */
     size_t vLen = src.getMode() == RegisterMode::Scalar ? 1 : dest.getVLen();
-bool zeroing = src.getType() == RegisterConfig::Load;
+bool zeroing = src.getPredMode() == PredicateMode::Zeroing;
     auto values = src.getElements();
     auto destElements = dest.getElements(false);
     auto validElementsIndex = src.getValidElements();
