@@ -1171,21 +1171,66 @@ riscv_insn_ext_uve = \
 	so_b_ndc_5 \
 	so_b_ndc_6 \
 	so_b_ndc_7 \
+	so_p_cv_b_h \
+	so_p_cv_b_w \
+	so_p_cv_b_d \
+	so_p_cv_w_b \
+	so_p_cv_w_h \
+	so_p_cv_w_d \
+	so_p_cv_h_b \
+	so_p_cv_h_w \
+	so_p_cv_h_d \
+	so_p_cv_w_b \
+	so_p_cv_w_h \
+	so_p_cv_w_d \
+	so_p_cv_d_b \
+	so_p_cv_d_h \
+	so_p_cv_d_w \
+	so_p_cv_b_h_z \
+	so_p_cv_b_w_z \
+	so_p_cv_b_d_z \
+	so_p_cv_w_b_z \
+	so_p_cv_w_h_z \
+	so_p_cv_w_d_z \
+	so_p_cv_h_b_z \
+	so_p_cv_h_w_z \
+	so_p_cv_h_d_z \
+	so_p_cv_w_b_z \
+	so_p_cv_w_h_z \
+	so_p_cv_w_d_z \
+	so_p_cv_d_b_z \
+	so_p_cv_d_h_z \
+	so_p_cv_d_w_z \
 	so_p_ge_fp \
+	so_p_ge_fp_z \
 	so_p_eq_fp \
+	so_p_eq_fp_z \
 	so_p_lt_fp \
+	so_p_lt_fp_z \
 	so_p_ge_sg \
+	so_p_ge_sg_z \
 	so_p_eq_sg \
+	so_p_eq_sg_z \
 	so_p_lt_sg \
+	so_p_lt_sg_z \
 	so_p_ge_us \
+	so_p_ge_us_z \
 	so_p_eq_us \
+	so_p_eq_us_z \
 	so_p_lt_us \
+	so_p_lt_us_z \
 	so_p_mv \
+	so_p_mv_z \
 	so_p_mvt \
+	so_p_mvt_z \
 	so_p_not \
+	so_p_not_z \
 	so_p_one \
+	so_p_one_z \
 	so_p_vr \
+	so_p_vr_z \
 	so_p_zero \
+	so_p_zero_z \
 	so_v_dp_b \
 	so_v_dp_d \
 	so_v_dp_h \
