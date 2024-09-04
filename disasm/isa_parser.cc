@@ -30,7 +30,7 @@ static void bad_priv_string(const char* priv)
 isa_parser_t::isa_parser_t(const char* str, const char *priv)
 {
   isa_string = strtolower(str);
-  const char* all_subsets = "mafdqcpvhb";
+  const char* all_subsets = "mafdqcbpvh";
 
   if (isa_string.compare(0, 4, "rv32") == 0)
     max_xlen = 32;
@@ -355,6 +355,8 @@ isa_parser_t::isa_parser_t(const char* str, const char *priv)
       elen = std::max(elen, new_elen);
     } else if (ext_str == "ssdbltrp") {
       extension_table[EXT_SSDBLTRP] = true;
+    } else if (ext_str == "smdbltrp") {
+      extension_table[EXT_SMDBLTRP] = true;
     } else if (ext_str[0] == 'x') {
       extension_table['X'] = true;
       if (ext_str.size() == 1) {

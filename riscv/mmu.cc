@@ -404,7 +404,7 @@ reg_t mmu_t::s2xlate(reg_t gva, reg_t gpa, access_type type, access_type trap_ty
   int maxgpabits = vm.levels * vm.idxbits + vm.widenbits + PGSHIFT;
   reg_t maxgpa = (1ULL << maxgpabits) - 1;
 
-  bool mxr = proc->state.sstatus->readvirt(false) & MSTATUS_MXR;
+  bool mxr = !is_for_vs_pt_addr && (proc->state.sstatus->readvirt(false) & MSTATUS_MXR);
   // tinst is set to 0x3000/0x3020 - for RV64 read/write respectively for
   // VS-stage address translation (for spike HSXLEN == VSXLEN always) else
   // tinst is set to 0x2000/0x2020 - for RV32 read/write respectively for
@@ -614,7 +614,7 @@ void mmu_t::register_memtracer(memtracer_t* t)
 }
 
 reg_t mmu_t::get_pmlen(bool effective_virt, reg_t effective_priv, xlate_flags_t flags) const {
-  if (!proc || proc->get_xlen() != 64 || (in_mprv() && (proc->state.sstatus->read() & MSTATUS_MXR)) || flags.hlvx)
+  if (!proc || proc->get_xlen() != 64 || ((proc->state.sstatus->readvirt(false) | proc->state.sstatus->readvirt(effective_virt)) & MSTATUS_MXR) || flags.hlvx)
     return 0;
 
   reg_t pmm = 0;
@@ -643,6 +643,7 @@ mem_access_info_t mmu_t::generate_access_info(reg_t addr, access_type type, xlat
     return {addr, addr, 0, false, {}, type};
   bool virt = proc->state.v;
   reg_t mode = proc->state.prv;
+  reg_t transformed_addr = addr;
   if (type != FETCH) {
     if (in_mprv()) {
       mode = get_field(proc->state.mstatus->read(), MSTATUS_MPP);
@@ -653,10 +654,11 @@ mem_access_info_t mmu_t::generate_access_info(reg_t addr, access_type type, xlat
       virt = true;
       mode = get_field(proc->state.hstatus->read(), HSTATUS_SPVP);
     }
+    auto xlen = proc->get_const_xlen();
+    reg_t pmlen = get_pmlen(virt, mode, xlate_flags);
+    reg_t satp = proc->state.satp->readvirt(virt);
+    bool is_physical_addr = mode == PRV_M || get_field(satp, SATP64_MODE) == SATP_MODE_OFF;
+    transformed_addr = is_physical_addr ? zext(addr, xlen - pmlen) : sext(addr, xlen - pmlen);
   }
-  reg_t pmlen = get_pmlen(virt, mode, xlate_flags);
-  reg_t satp = proc->state.satp->readvirt(virt);
-  bool is_physical_addr = mode == PRV_M || get_field(satp, SATP64_MODE) == SATP_MODE_OFF;
-  reg_t transformed_addr = is_physical_addr ? zext(addr, 64 - pmlen) : sext(addr, 64 - pmlen);
   return {addr, transformed_addr, mode, virt, xlate_flags, type};
 }
