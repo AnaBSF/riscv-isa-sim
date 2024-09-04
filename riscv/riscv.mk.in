@@ -1176,14 +1176,11 @@ riscv_insn_ext_uve = \
 	so_p_cv_b_w \
 	so_p_cv_b_d \
 	so_p_cv_w_b \
-	so_p_cv_w_h \
 	so_p_cv_w_d \
+	so_p_cv_w_h \
 	so_p_cv_h_b \
 	so_p_cv_h_w \
 	so_p_cv_h_d \
-	so_p_cv_w_b \
-	so_p_cv_w_h \
-	so_p_cv_w_d \
 	so_p_cv_d_b \
 	so_p_cv_d_h \
 	so_p_cv_d_w \
@@ -1196,9 +1193,6 @@ riscv_insn_ext_uve = \
 	so_p_cv_h_b_z \
 	so_p_cv_h_w_z \
 	so_p_cv_h_d_z \
-	so_p_cv_w_b_z \
-	so_p_cv_w_h_z \
-	so_p_cv_w_d_z \
 	so_p_cv_d_b_z \
 	so_p_cv_d_h_z \
 	so_p_cv_d_w_z \
@@ -1245,16 +1239,16 @@ riscv_insn_ext_uve = \
 	so_v_mvvs \
 	ss_app \
 	ss_end \
-	ss_app_ind_ofs_add_1 \
-	ss_app_ind_ofs_dec_1 \
-	ss_app_ind_ofs_inc_1 \
-	ss_app_ind_ofs_set_1 \
-	ss_app_ind_ofs_sub_1 \
 	ss_app_sgi_ofs_add \
 	ss_app_sgi_ofs_dec \
 	ss_app_sgi_ofs_inc \
 	ss_app_sgi_ofs_set \
 	ss_app_sgi_ofs_sub \
+	ss_app_ind_ofs_add_1 \
+	ss_app_ind_ofs_dec_1 \
+	ss_app_ind_ofs_inc_1 \
+	ss_app_ind_ofs_set_1 \
+	ss_app_ind_ofs_sub_1 \
 	ss_app_ind_siz_add_1 \
 	ss_app_ind_siz_dec_1 \
 	ss_app_ind_siz_inc_1 \
@@ -1265,6 +1259,106 @@ riscv_insn_ext_uve = \
 	ss_app_ind_str_inc_1 \
 	ss_app_ind_str_set_1 \
 	ss_app_ind_str_sub_1 \
+	ss_app_ind_siz_add_2 \
+	ss_app_ind_siz_dec_2 \
+	ss_app_ind_siz_inc_2 \
+	ss_app_ind_siz_set_2 \
+	ss_app_ind_siz_sub_2 \
+	ss_app_ind_str_add_2 \
+	ss_app_ind_str_dec_2 \
+	ss_app_ind_str_inc_2 \
+	ss_app_ind_str_set_2 \
+	ss_app_ind_str_sub_2 \
+	ss_app_ind_ofs_add_2 \
+	ss_app_ind_ofs_dec_2 \
+	ss_app_ind_ofs_inc_2 \
+	ss_app_ind_ofs_set_2 \
+	ss_app_ind_ofs_sub_2 \
+	ss_app_ind_siz_add_3 \
+	ss_app_ind_siz_dec_3 \
+	ss_app_ind_siz_inc_3 \
+	ss_app_ind_siz_set_3 \
+	ss_app_ind_siz_sub_3 \
+	ss_app_ind_str_add_3 \
+	ss_app_ind_str_dec_3 \
+	ss_app_ind_str_inc_3 \
+	ss_app_ind_str_set_3 \
+	ss_app_ind_str_sub_3 \
+	ss_app_ind_ofs_add_3 \
+	ss_app_ind_ofs_dec_3 \
+	ss_app_ind_ofs_inc_3 \
+	ss_app_ind_ofs_set_3 \
+	ss_app_ind_ofs_sub_3 \
+	ss_app_ind_siz_add_4 \
+	ss_app_ind_siz_dec_4 \
+	ss_app_ind_siz_inc_4 \
+	ss_app_ind_siz_set_4 \
+	ss_app_ind_siz_sub_4 \
+	ss_app_ind_str_add_4 \
+	ss_app_ind_str_dec_4 \
+	ss_app_ind_str_inc_4 \
+	ss_app_ind_str_set_4 \
+	ss_app_ind_str_sub_4 \
+	ss_app_ind_ofs_add_4 \
+	ss_app_ind_ofs_dec_4 \
+	ss_app_ind_ofs_inc_4 \
+	ss_app_ind_ofs_set_4 \
+	ss_app_ind_ofs_sub_4 \
+	ss_app_ind_siz_add_5 \
+	ss_app_ind_siz_dec_5 \
+	ss_app_ind_siz_inc_5 \
+	ss_app_ind_siz_set_5 \
+	ss_app_ind_siz_sub_5 \
+	ss_app_ind_str_add_5 \
+	ss_app_ind_str_dec_5 \
+	ss_app_ind_str_inc_5 \
+	ss_app_ind_str_set_5 \
+	ss_app_ind_str_sub_5 \
+	ss_app_ind_ofs_add_5 \
+	ss_app_ind_ofs_dec_5 \
+	ss_app_ind_ofs_inc_5 \
+	ss_app_ind_ofs_set_5 \
+	ss_app_ind_ofs_sub_5 \
+	ss_app_ind_siz_add_6 \
+	ss_app_ind_siz_dec_6 \
+	ss_app_ind_siz_inc_6 \
+	ss_app_ind_siz_set_6 \
+	ss_app_ind_siz_sub_6 \
+	ss_app_ind_str_add_6 \
+	ss_app_ind_str_dec_6 \
+	ss_app_ind_str_inc_6 \
+	ss_app_ind_str_set_6 \
+	ss_app_ind_str_sub_6 \
+	ss_app_ind_ofs_add_6 \
+	ss_app_ind_ofs_dec_6 \
+	ss_app_ind_ofs_inc_6 \
+	ss_app_ind_ofs_set_6 \
+	ss_app_ind_ofs_sub_6 \
+	ss_app_ind_siz_add_7 \
+	ss_app_ind_siz_dec_7 \
+	ss_app_ind_siz_inc_7 \
+	ss_app_ind_siz_set_7 \
+	ss_app_ind_siz_sub_7 \
+	ss_app_ind_str_add_7 \
+	ss_app_ind_str_dec_7 \
+	ss_app_ind_str_inc_7 \
+	ss_app_ind_str_set_7 \
+	ss_app_ind_str_sub_7 \
+	ss_app_ind_ofs_add_7 \
+	ss_app_ind_ofs_dec_7 \
+	ss_app_ind_ofs_inc_7 \
+	ss_app_ind_ofs_set_7 \
+	ss_app_ind_ofs_sub_7 \
+	ss_app_ind_siz_add_l \
+	ss_app_ind_siz_dec_l \
+	ss_app_ind_siz_inc_l \
+	ss_app_ind_siz_set_l \
+	ss_app_ind_siz_sub_l \
+	ss_app_ind_str_add_l \
+	ss_app_ind_str_dec_l \
+	ss_app_ind_str_inc_l \
+	ss_app_ind_str_set_l \
+	ss_app_ind_str_sub_l \
 	ss_app_mod_ofs_dec_1 \
 	ss_app_mod_ofs_inc_1 \
 	ss_app_mod_siz_dec_1 \
@@ -1277,6 +1371,42 @@ riscv_insn_ext_uve = \
 	ss_app_mod_siz_inc_2 \
 	ss_app_mod_str_dec_2 \
 	ss_app_mod_str_inc_2 \
+	ss_app_mod_ofs_dec_3 \
+	ss_app_mod_ofs_inc_3 \
+	ss_app_mod_siz_dec_3 \
+	ss_app_mod_siz_inc_3 \
+	ss_app_mod_str_dec_3 \
+	ss_app_mod_str_inc_3 \
+	ss_app_mod_ofs_dec_4 \
+	ss_app_mod_ofs_inc_4 \
+	ss_app_mod_siz_dec_4 \
+	ss_app_mod_siz_inc_4 \
+	ss_app_mod_str_dec_4 \
+	ss_app_mod_str_inc_4 \
+	ss_app_mod_ofs_dec_5 \
+	ss_app_mod_ofs_inc_5 \
+	ss_app_mod_siz_dec_5 \
+	ss_app_mod_siz_inc_5 \
+	ss_app_mod_str_dec_5 \
+	ss_app_mod_str_inc_5 \
+	ss_app_mod_ofs_dec_6 \
+	ss_app_mod_ofs_inc_6 \
+	ss_app_mod_siz_dec_6 \
+	ss_app_mod_siz_inc_6 \
+	ss_app_mod_str_dec_6 \
+	ss_app_mod_str_inc_6 \
+	ss_app_mod_ofs_dec_7 \
+	ss_app_mod_ofs_inc_7 \
+	ss_app_mod_siz_dec_7 \
+	ss_app_mod_siz_inc_7 \
+	ss_app_mod_str_dec_7 \
+	ss_app_mod_str_inc_7 \
+	ss_app_mod_ofs_dec_l \
+	ss_app_mod_ofs_inc_l \
+	ss_app_mod_siz_dec_l \
+	ss_app_mod_siz_inc_l \
+	ss_app_mod_str_dec_l \
+	ss_app_mod_str_inc_l \
 	ss_end_sgi_ofs_add \
 	ss_end_sgi_ofs_dec \
 	ss_end_sgi_ofs_inc \
@@ -1310,6 +1440,26 @@ riscv_insn_ext_uve = \
 	ss_sta_ld_d_v_2 \
 	ss_sta_ld_h_v_2 \
 	ss_sta_ld_w_v_2 \
+	ss_sta_ld_b_v_3 \
+	ss_sta_ld_d_v_3 \
+	ss_sta_ld_h_v_3 \
+	ss_sta_ld_w_v_3 \
+	ss_sta_ld_b_v_4 \
+	ss_sta_ld_d_v_4 \
+	ss_sta_ld_h_v_4 \
+	ss_sta_ld_w_v_4 \
+	ss_sta_ld_b_v_5 \
+	ss_sta_ld_d_v_5 \
+	ss_sta_ld_h_v_5 \
+	ss_sta_ld_w_v_5 \
+	ss_sta_ld_b_v_6 \
+	ss_sta_ld_d_v_6 \
+	ss_sta_ld_h_v_6 \
+	ss_sta_ld_w_v_6 \
+	ss_sta_ld_b_v_7 \
+	ss_sta_ld_d_v_7 \
+	ss_sta_ld_h_v_7 \
+	ss_sta_ld_w_v_7 \
 	ss_sta_ld_b_v_1_m \
 	ss_sta_ld_d_v_1_m \
 	ss_sta_ld_h_v_1_m \
@@ -1318,6 +1468,26 @@ riscv_insn_ext_uve = \
 	ss_sta_ld_d_v_2_m \
 	ss_sta_ld_h_v_2_m \
 	ss_sta_ld_w_v_2_m \
+	ss_sta_ld_b_v_3_m \
+	ss_sta_ld_d_v_3_m \
+	ss_sta_ld_h_v_3_m \
+	ss_sta_ld_w_v_3_m \
+	ss_sta_ld_b_v_4_m \
+	ss_sta_ld_d_v_4_m \
+	ss_sta_ld_h_v_4_m \
+	ss_sta_ld_w_v_4_m \
+	ss_sta_ld_b_v_5_m \
+	ss_sta_ld_d_v_5_m \
+	ss_sta_ld_h_v_5_m \
+	ss_sta_ld_w_v_5_m \
+	ss_sta_ld_b_v_6_m \
+	ss_sta_ld_d_v_6_m \
+	ss_sta_ld_h_v_6_m \
+	ss_sta_ld_w_v_6_m \
+	ss_sta_ld_b_v_7_m \
+	ss_sta_ld_d_v_7_m \
+	ss_sta_ld_h_v_7_m \
+	ss_sta_ld_w_v_7_m \
 	ss_sta_st_b \
 	ss_sta_st_d \
 	ss_sta_st_h \
@@ -1334,6 +1504,26 @@ riscv_insn_ext_uve = \
 	ss_sta_st_d_v_2 \
 	ss_sta_st_h_v_2 \
 	ss_sta_st_w_v_2 \
+	ss_sta_st_b_v_3 \
+	ss_sta_st_d_v_3 \
+	ss_sta_st_h_v_3 \
+	ss_sta_st_w_v_3 \
+	ss_sta_st_b_v_4 \
+	ss_sta_st_d_v_4 \
+	ss_sta_st_h_v_4 \
+	ss_sta_st_w_v_4 \
+	ss_sta_st_b_v_5 \
+	ss_sta_st_d_v_5 \
+	ss_sta_st_h_v_5 \
+	ss_sta_st_w_v_5 \
+	ss_sta_st_b_v_6 \
+	ss_sta_st_d_v_6 \
+	ss_sta_st_h_v_6 \
+	ss_sta_st_w_v_6 \
+	ss_sta_st_b_v_7 \
+	ss_sta_st_d_v_7 \
+	ss_sta_st_h_v_7 \
+	ss_sta_st_w_v_7 \
 
 riscv_insn_list = \
 	$(riscv_insn_ext_i) \
