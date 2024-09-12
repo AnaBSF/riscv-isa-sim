@@ -532,6 +532,14 @@ std::vector<uint8_t> predRegister_t::getPredicate() const {
     return elements;
 }
 
+PredicateMode predRegister_t::getPredMode() const {
+    return predMode;
+}
+
+void predRegister_t::setPredMode(const PredicateMode pm) {
+    predMode = pm;
+}
+
 void streamingUnit_t::updateEODTable(const size_t stream) {
     int r = 0, d = 0;
     std::visit([&](const auto reg) {
@@ -545,35 +553,35 @@ void streamingUnit_t::updateEODTable(const size_t stream) {
 }
 
 template <typename T>
-void streamingUnit_t::makeStreamRegister(size_t streamRegister, RegisterConfig type) {
+void streamingUnit_t::makeStreamRegister(size_t streamRegister, RegisterConfig type, PredicateMode pm) {
     assert_msg("Tried to use a register index higher than the available registers", streamRegister < registerCount);
     if constexpr (std::is_same_v<T, std::uint8_t>) {
-        registers.at(streamRegister) = StreamReg8{this, type, streamRegister};
+        registers.at(streamRegister) = StreamReg8{this, pm, type, streamRegister};
     } else if constexpr (std::is_same_v<T, std::uint16_t>) {
-        registers.at(streamRegister) = StreamReg16{this, type, streamRegister};
+        registers.at(streamRegister) = StreamReg16{this, pm, type, streamRegister};
     } else if constexpr (std::is_same_v<T, std::uint32_t>) {
-        registers.at(streamRegister) = StreamReg32{this, type, streamRegister};
+        registers.at(streamRegister) = StreamReg32{this, pm, type, streamRegister};
     } else if constexpr (std::is_same_v<T, std::uint64_t>) {
-        registers.at(streamRegister) = StreamReg64{this, type, streamRegister};
+        registers.at(streamRegister) = StreamReg64{this, pm, type, streamRegister};
     } else {
         static_assert(always_false_v<T>, "Cannot create register with this element width");
     }
 }
 
-void streamingUnit_t::makePredRegister(std::vector<uint8_t> elements, size_t predRegister) {
+void streamingUnit_t::makePredRegister(std::vector<uint8_t> elements, size_t predRegister, PredicateMode pm) {
     assert_msg("Tried to alter p0 register, which is hardwired to 1", predRegister);
     assert_msg("Tried to use a predicate register index higher than the available predicate registers", predRegister < predRegCount);
     assert_msg("Tried to create predicate with invalid size", elements.size() == predicates.at(predRegister).vLen);
     for (auto &p : elements)
         assert_msg("Invalid values for predicate (must be 0 or 1)", !p || p == 1);
-    predicates.at(predRegister).elements = elements;
+    predicates.at(predRegister) = predRegister_t{elements, pm};
 }
 
 template class streamRegister_t<uint8_t>;
 template class streamRegister_t<uint16_t>;
 template class streamRegister_t<uint32_t>;
 template class streamRegister_t<uint64_t>;
-template void streamingUnit_t::makeStreamRegister<uint8_t>(size_t streamRegister, RegisterConfig type);
-template void streamingUnit_t::makeStreamRegister<uint16_t>(size_t streamRegister, RegisterConfig type);
-template void streamingUnit_t::makeStreamRegister<uint32_t>(size_t streamRegister, RegisterConfig type);
-template void streamingUnit_t::makeStreamRegister<uint64_t>(size_t streamRegister, RegisterConfig type);
+template void streamingUnit_t::makeStreamRegister<uint8_t>(size_t streamRegister, RegisterConfig type, PredicateMode pm);
+template void streamingUnit_t::makeStreamRegister<uint16_t>(size_t streamRegister, RegisterConfig type, PredicateMode pm);
+template void streamingUnit_t::makeStreamRegister<uint32_t>(size_t streamRegister, RegisterConfig type, PredicateMode pm);
+template void streamingUnit_t::makeStreamRegister<uint64_t>(size_t streamRegister, RegisterConfig type, PredicateMode pm);

@@ -11,8 +11,6 @@ class streamingUnit_t;
 // extern processor_t *globalProcessor;
 #define gMMU(p) (*(p->get_mmu()))
 
-/* --- Streaming Registers --- */
-
 enum class RegisterConfig { NoStream,
                             Load,
                             IndSource,
@@ -25,6 +23,8 @@ enum class RegisterMode { Vector,
 
 enum class PredicateMode { Zeroing,
                            Merging };   
+
+/* --- Streaming Registers --- */
 
 /* T is one of std::uint8_t, std::uint16_t, std::uint32_t or std::uint64_t and
   represents the type of the elements of a stream at a given moment. It is the
@@ -60,11 +60,10 @@ struct streamRegister_t {
     /* FOR DEBUGGING */
     size_t registerN;
 
-    streamRegister_t(streamingUnit_t *su = nullptr, RegisterConfig t = RegisterConfig::NoStream, size_t regN = -1) :
-     registerN(regN), su(su), type(t) {
+    streamRegister_t(streamingUnit_t *su = nullptr, PredicateMode pm = PredicateMode::Zeroing, RegisterConfig t = RegisterConfig::NoStream, size_t regN = -1) :
+     registerN(regN), su(su), predMode(pm), type(t) {
         status = RegisterStatus::NotConfigured;
         mode = RegisterMode::Vector;
-        predMode = PredicateMode::Zeroing;
         validElements = vLen;
         vecCfgDim = -1;
         baseAddress = 0;
@@ -115,10 +114,10 @@ private:
     std::unordered_multimap<int, staticModifier_t> staticModifiers;
     std::unordered_multimap<int, dynamicModifier_t> dynamicModifiers;
     std::unordered_multimap<int, scatterGModifier_t> scatterGModifiers;
+    PredicateMode predMode;
     RegisterConfig type;
     RegisterStatus status;
     RegisterMode mode;
-    PredicateMode predMode;
     /* This structure holds an array of bits indicating whether the corresponding dimension
     is configured to only load elements while the current dimension is not over or not. It
     is controlled using the instruction ss_cfg_vec */
@@ -145,14 +144,20 @@ struct predRegister_t {
     static constexpr size_t elementWidth = sizeof(uint8_t);
     static constexpr size_t vLen = registerLength / elementWidth;
 
-    predRegister_t(std::vector<uint8_t> e = std::vector<uint8_t>(vLen)) {
+    predRegister_t(std::vector<uint8_t> e = std::vector<uint8_t>(vLen), PredicateMode pm = PredicateMode::Merging) {
         elements = e;
+        predMode = pm;
     }
 
     std::vector<uint8_t> getPredicate() const;
 
+    PredicateMode getPredMode() const;
+    void setPredMode(const PredicateMode pm);
+
 private:
     std::vector<uint8_t> elements = std::vector<uint8_t>(vLen);
+
+    PredicateMode predMode;
 
     friend class streamingUnit_t;
 };
@@ -165,7 +170,7 @@ using StreamReg32 = streamRegister_t<std::uint32_t>;
 using StreamReg64 = streamRegister_t<std::uint64_t>;
 
 struct streamingUnit_t {
-    processor_t *p = nullptr; // updated by the processor in processor.cc (ln 44)
+    processor_t *p = nullptr; // updated by the processor in processor.cc
     /* UVE specification is to have 32 streaming/vectorial registers */
     static constexpr size_t registerCount = 32;
     static constexpr size_t predRegCount = 16;
@@ -188,9 +193,9 @@ struct streamingUnit_t {
     }
 
     template <typename T>
-    void makeStreamRegister(size_t streamRegister = -1, RegisterConfig type = RegisterConfig::NoStream);
+    void makeStreamRegister(size_t streamRegister, RegisterConfig type = RegisterConfig::NoStream, PredicateMode pm = PredicateMode::Zeroing);
 
-    void makePredRegister(std::vector<uint8_t> elements, size_t predRegister = -1);
+    void makePredRegister(std::vector<uint8_t> elements, size_t predRegister, PredicateMode pm = PredicateMode::Merging);
 
     void updateEODTable(const size_t stream);
 
