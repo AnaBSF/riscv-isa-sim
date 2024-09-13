@@ -418,21 +418,6 @@ void streamRegister_t<T>::updateAsLoad() {
     size_t eCount = 0;
     validElements = 0; // reset valid index
 
-    /*----------------------------------- Loading pipeline -----------------------------------
-    ************************************* THIS IS OUTDATED ***********************************
-    * Iterate stream
-    * Try to load 1 element if not EOD of vector coupled dimension and stream is not finished
-    *      Generate offset
-    *      Push element to register
-    *      Break if:
-    *          EOD if vector coupled
-    *          Register limit reached
-    *      Iterate stream
-    * End
-    *
-    * This iterates the stream before their first load, skipping 1 iteration.
-    *----------------------------------------------------------------------------------------*/
-
     size_t offset;
 
     size_t max = mode == RegisterMode::Vector ? vLen : 1;
