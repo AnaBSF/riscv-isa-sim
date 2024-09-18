@@ -8,14 +8,27 @@ auto baseBehaviour = [](auto &dest, auto &src, auto extra) {
     using OperationType = decltype(extra);
     size_t destVLen = dest.getVLen();
     size_t srcVLen = src.getVLen();
-    size_t finalElementCount = std::min(destVLen, src.getValidElements());
     
-    auto elements = src.getElements();
+    auto elements = src.getElements(!src.getValidElements());
+
+    auto srcValidElements = src.getValidElements();
+
+    size_t finalElementCount = std::min(destVLen, srcValidElements);
 
     std::vector<StorageType> out(destVLen, 0);
 
     for (size_t i = 0; i < finalElementCount; ++i)
-        out.at(i) = static_cast<StorageType>(readAS<OperationType>(elements.at(i)));
+        out.at(i) = readAS<StorageType>(static_cast<unsigned char>(readAS<OperationType>(elements.at(i))));
+
+    if (finalElementCount < srcValidElements) {
+        src.setValidIndex(srcValidElements-finalElementCount);
+        // set src elements to the remaining elements (from finalElementCount to srcValidElements)
+       decltype(elements) newElements(srcVLen, 0);
+        for (size_t i = 0; i < srcValidElements - finalElementCount; ++i)
+            newElements.at(i) = elements.at(i + finalElementCount);
+        src.setElements(newElements);
+    } else 
+        src.setValidIndex(0);
 
     dest.setValidIndex(finalElementCount);
     dest.setElements(out);

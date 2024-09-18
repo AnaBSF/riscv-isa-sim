@@ -83,7 +83,8 @@ void streamRegister_t<T>::addDimension(dimension_t dim) {
 template <typename T>
 void streamRegister_t<T>::configureVecDim(const int cfgIndex) {
     mode = RegisterMode::Vector;
-    validElements = vLen;
+    if (type != RegisterConfig::Load)
+        validElements = vLen;
     vecCfgDim = cfgIndex;
 }
 
@@ -91,7 +92,7 @@ template <typename T>
 void streamRegister_t<T>::startConfiguration(size_t base_address) {
     status = RegisterStatus::NotConfigured;
     mode = RegisterMode::Scalar;
-    validElements = 1;
+    //validElements = 1;
     baseAddress = base_address;
     dimensions.clear();
 }
@@ -153,7 +154,7 @@ bool streamRegister_t<T>::getDynModElement(int &value) {
 
 template <typename T>
 void streamRegister_t<T>::setElements(std::vector<T> e, bool causesUpdate) {
-    assert_msg("Trying to set values to a load stream", type != RegisterConfig::Load && type != RegisterConfig::IndSource);
+    //assert_msg("Trying to set values to a load stream", type != RegisterConfig::Load && type != RegisterConfig::IndSource);
 
     elements = e;
 
@@ -171,10 +172,12 @@ void streamRegister_t<T>::setValidIndex(const size_t i) {
 template <typename T>
 void streamRegister_t<T>::setMode(const RegisterMode m) {
     mode = m;
-    if (m == RegisterMode::Scalar)
-        validElements = 1;
-    else
-        validElements = vLen;
+    if (type != RegisterConfig::Load){
+        if (m == RegisterMode::Scalar)
+            validElements = 1;
+        else
+            validElements = vLen;
+    }
 }
 
 template <typename T>

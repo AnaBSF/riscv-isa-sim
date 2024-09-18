@@ -64,7 +64,7 @@ struct streamRegister_t {
      registerN(regN), su(su), predMode(pm), type(t) {
         status = RegisterStatus::NotConfigured;
         mode = RegisterMode::Vector;
-        validElements = vLen;
+        validElements = 0;
         vecCfgDim = -1;
         baseAddress = 0;
     }
