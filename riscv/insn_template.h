@@ -10,3 +10,4 @@
 #include "v_ext_macros.h"
 #include "debug_defines.h"
 #include <assert.h>
+#include <math.h>
