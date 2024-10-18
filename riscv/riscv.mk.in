@@ -1142,6 +1142,9 @@ riscv_insn_ext_uve = \
 	so_a_mul_fp \
 	so_a_mul_sg \
 	so_a_mul_us \
+	so_a_sqrt_fp \
+	so_a_sqrt_sg \
+	so_a_sqrt_us \
 	so_a_sub_fp \
 	so_a_sub_sg \
 	so_a_sub_us \
@@ -1226,6 +1229,16 @@ riscv_insn_ext_uve = \
 	so_p_vr_z \
 	so_p_zero \
 	so_p_zero_z \
+	so_v_cv_us_b \
+	so_v_cv_us_h \
+	so_v_cv_us_w \
+	so_v_cv_us_d \
+	so_v_cv_sg_b \
+	so_v_cv_sg_h \
+	so_v_cv_sg_w \
+	so_v_cv_sg_d \
+	so_v_cv_fp_w \
+	so_v_cv_fp_d \
 	so_v_dp_b \
 	so_v_dp_d \
 	so_v_dp_h \

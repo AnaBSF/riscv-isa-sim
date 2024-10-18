@@ -64,8 +64,8 @@ struct streamRegister_t {
      registerN(regN), su(su), predMode(pm), type(t) {
         status = RegisterStatus::NotConfigured;
         mode = RegisterMode::Vector;
-        validElements = vLen;
-        vecCfgDim = -1;
+        validElements = 0;
+        vecCfgDim = 0;
         baseAddress = 0;
     }
 
@@ -118,9 +118,7 @@ private:
     RegisterConfig type;
     RegisterStatus status;
     RegisterMode mode;
-    /* This structure holds an array of bits indicating whether the corresponding dimension
-    is configured to only load elements while the current dimension is not over or not. It
-    is controlled using the instruction ss_cfg_vec */
+
     int vecCfgDim;
 
     size_t baseAddress;

@@ -45,6 +45,10 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
 
     auto validElementsIndex = std::min(src1.getValidElements(), src2.getValidElements());
 
+    // print number of valid elements
+    //std::cout << "u" << src1.registerN << "    src1 valid elements: " << src1.getValidElements() << "\n";
+    //std::cout << "u" << src2.registerN << "    src2 valid elements: " << src2.getValidElements() << "\n";
+
     auto pi = pred.getPredicate();
 
     for (size_t i = 0; i < vLen; i++) {
@@ -55,6 +59,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
                 OperationType e3 = readAS<OperationType>(destElements.at(i));
                 out.at(i) = readAS<StorageType>(OperationType(e1 * e2 + e3));
                 //std::cout << "MAC   e1: " << e1 << " e2: " << e2 << " e3: " << e3 << " result: " << readAS<OperationType>(out.at(i)) << std::endl;
+                
             }
         } else if (zeroing)
             out.at(i) = 0; // zeroing out the rest of the elements

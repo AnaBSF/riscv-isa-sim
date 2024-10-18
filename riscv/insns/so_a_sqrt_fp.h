@@ -1,4 +1,3 @@
-// std::cout << "\n---ADDE---" << "\n";
 auto streamReg = insn.uve_rd();
 auto &destReg = P.SU.registers[streamReg];
 auto &srcReg = P.SU.registers[insn.uve_rs1()];
@@ -6,24 +5,33 @@ auto &predReg = P.SU.predicates[insn.uve_pred()];
 
 // The extra argument is passed because we need to tell the lambda the computation type. In C++20 we would use a lambda template parameter, however in C++17 we don't have those. As such, we pass an extra value to later on infer its type and know the storage we need to use
 auto baseBehaviour = [](auto &dest, auto &src, auto &pred, auto extra) {
+    auto vLen = src.getMode() == RegisterMode::Scalar ? 1 : dest.getVLen();
+    bool zeroing = src.getPredMode() == PredicateMode::Zeroing;
+
     auto elements = src.getElements();
     auto destElements = dest.getElements(false);
-    auto pi = pred.getPredicate();
     auto validElementsIndex = src.getValidElements();
+    auto pi = pred.getPredicate();
 
     using StorageType = typename std::remove_reference_t<decltype(dest)>::ElementsType;
     using OperationType = decltype(extra);
 
-    OperationType value = 0;
+    std::vector<StorageType> out = destElements;
 
-    std::vector<StorageType> out = destElements; // ??
-
-    for (size_t i = 0; i < validElementsIndex; i++) {
-        if (pi.at((i+1)*sizeof(OperationType)-1))
-            value += readAS<OperationType>(elements.at(i));
+    for (size_t i = 0; i < vLen; i++) {
+        if (i < validElementsIndex){
+            if (pi.at((i+1)*sizeof(OperationType)-1)){
+                OperationType e = readAS<OperationType>(elements.at(i));
+                if (e >= 0.0)
+                    out.at(i) = readAS<StorageType>(sqrt(e));
+                else
+                    out.at(i) = readAS<StorageType>(0.0);
+            }
+        } else
+            out.at(i) = 0; // zeroing out the rest of the elements
     }
-    out.at(0) = readAS<StorageType>(value);
-    dest.setMode(RegisterMode::Scalar);
+    //dest.setValidIndex(dest.vLen);
+    dest.setMode(vLen == 1 ? RegisterMode::Scalar : RegisterMode::Vector);
     dest.setElements(out);
 };
 
@@ -37,12 +45,12 @@ std::visit([&](auto &dest) {
             P.SU.makeStreamRegister<std::uint32_t>(streamReg);
             dest.endConfiguration();
         } else
-            assert_msg("Trying to run so.a.adde.fp with invalid src type", false);
+            assert_msg("Trying to run so.a.sqrt.fp with invalid src type", false);
     }
 }, destReg);
 
 std::visit(overloaded{
     [&](StreamReg64 &dest, StreamReg64 &src) { baseBehaviour(dest, src, predReg, double{}); },
     [&](StreamReg32 &dest, StreamReg32 &src) { baseBehaviour(dest, src, predReg, float{}); },
-    [&](auto &dest, auto &src) { assert_msg("Invoking so.a.adde.fp with invalid parameter sizes", false); }
+    [&](auto &dest, auto &src) { assert_msg("Invoking so.a.sqrt.fp with invalid parameter sizes", false); }
 }, destReg, srcReg);
