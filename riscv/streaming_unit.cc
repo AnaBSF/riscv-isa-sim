@@ -257,8 +257,9 @@ size_t streamRegister_t<T>::generateAddress() {
     int dimN = 0;
 
     return std::accumulate(dimensions.rbegin(), dimensions.rend(), init, [&](size_t acc, dimension_t &dim) {
-        if (dim.isLastIteration() && isDimensionFullyDone(dimensions.end() - dimN, dimensions.end()))
+        if (dim.isLastIteration() && isDimensionFullyDone(dimensions.end() - dimN, dimensions.end())){
             dim.setEndOfDimension(true);   
+        }
         ++dimN;
         return acc + dim.calcAddress(elementWidth);
     });
@@ -501,16 +502,17 @@ void streamRegister_t<T>::updateAsStore() {
             gMMU(su->p).template store<std::uint32_t>(offset, readAS<ElementsType>(value));
         else
             gMMU(su->p).template store<std::uint64_t>(offset, readAS<ElementsType>(value));
-
-        if (tryGenerateAddress(offset)) {
+        for (size_t i = 0; i < dimensions.size(); i++)
+            setSGModsNotApplied(i);
+        if (tryGenerateAddress(offset) && ++eCount < validElements) {
             updateIteration(); // reset EOD flags and iterate stream
-            ++eCount;
+            //++eCount;
         } else
             break;
     }
     //std::cout << std::endl;
     su->updateEODTable(registerN); // save current state of the stream so that branches can catch EOD flags
-    if (eCount < validElements)       // iteration is already updated when register is full
+    //if (eCount < validElements)       // iteration is already updated when register is full
         updateIteration();         // reset EOD flags and iterate stream
     // elements.clear();
 }
@@ -533,7 +535,6 @@ void streamingUnit_t::updateEODTable(const size_t stream) {
         int d = 0;
         for (const auto dim : reg.dimensions) {
             EODTable.at(stream).at(d) = /*reg.vecCfg.at(d) &&*/ dim.isEndOfDimension();
-            // fprintf(stderr, "EOD of u%d: %d\n", stream, EODTable.at(stream).at(d));
             ++d;
         }
     }, registers.at(stream));

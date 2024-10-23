@@ -25,6 +25,8 @@ auto baseBehaviour = [](auto &dest, auto &src, auto &pred, auto extra) {
     out.at(0) = readAS<StorageType>(value);
     dest.setMode(RegisterMode::Scalar);
     dest.setElements(out);
+
+    //std::cout << value << "\n";
 };
 
 // If the destination register is not configured, we have to build it before the operation so that its element size matches before any calculations are done

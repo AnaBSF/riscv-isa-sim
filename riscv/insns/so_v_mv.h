@@ -16,7 +16,7 @@ auto baseBehaviour = [](auto &dest, auto &src, auto &pred) {
     //std::cout << "MV   ";
     for (size_t i = 0; i < validElementsIndex; ++i){
         out.at(i) = pi.at((i+1)*sizeof(StorageType)-1) ? elements.at(i) : destElements.at(i);
-        //std::cout << readAS<double>(out.at(i)) << " ";
+        //std::cout << "MV[" << i << "]   " << readAS<double>(out.at(i)) << "\n";
     }
     //std::cout << "\n";
     dest.setValidIndex(validElementsIndex);
