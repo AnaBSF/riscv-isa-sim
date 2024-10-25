@@ -21,6 +21,7 @@ auto baseBehaviour = [](auto &dest, auto &src, auto &pred) {
     //std::cout << "\n";
     dest.setValidIndex(validElementsIndex);
     dest.setElements(out);
+    //std::cout << "\n\n";
 };
 
 /* If the destination register is not configured, we have to build it before the

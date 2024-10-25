@@ -40,6 +40,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
     //dest.setValidIndex(dest.vLen);
     dest.setMode(vLen == 1 ? RegisterMode::Scalar : RegisterMode::Vector);
     dest.setElements(out);
+    //std::cout << "\n\n";
 };
 
 /* If the destination register is not configured, we have to build it before the

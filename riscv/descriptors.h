@@ -25,7 +25,7 @@ struct dimension_t {
 
     void resetIterValues();
     bool isEmpty() const;
-    void advance();
+    bool advance();
     bool isLastIteration() const;
     bool isModApplied() const;
     bool isEndOfDimension() const;

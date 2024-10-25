@@ -9,14 +9,25 @@ void dimension_t::resetIterValues() {
     iter_offset = offset;
     iter_size = size;
     iter_stride = stride;
+    endOfDimension = iter_size == 0;
+
+    //std::cout << "RESET >>> iter_size: " << iter_size << std::endl;
 }
 
 bool dimension_t::isEmpty() const {
     return iter_size == 0;
 }
 
-void dimension_t::advance() {
+bool dimension_t::advance() {
+    if (iter_size == 0) {
+        //std::cout << "CANNOT ADVANCE >>> size: " << iter_size << ", idx: " << iter_index << std::endl;
+        return false;
+    }
     ++iter_index;
+    if(iter_index >= iter_size)
+        setEndOfDimension(true);
+    //std::cout << "ADVANCE >>> size: " << iter_size << ", idx: " << iter_index << std::endl;
+    return true;
 }
 
 bool dimension_t::isLastIteration() const {
@@ -35,10 +46,7 @@ void dimension_t::setEndOfDimension(bool b) {
 }
 
 size_t dimension_t::calcAddress(size_t width) const {
-    /*std::cout << "iter_offset: " << iter_offset << ", iter_stride: " <<
-    iter_stride << ", iter_index: " << iter_index << ", width: " << width << std::endl;
-    std::cout << "iter_stride * iter_index * width: " << iter_stride * iter_index * width << std::endl;
-    */
+    //std::cout << "...Calculating address: siz: " << iter_size  << ", idx: " << iter_index << std::endl;
     return iter_offset + iter_stride * iter_index * width;
 }
 
@@ -57,7 +65,11 @@ void staticModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t 
         // std::cout << "iter_offset: " << dim.iter_offset << std::endl;
     } else if (target == Target::Size) {
         dim.iter_size += valueChange;
-        // std::cout << "valueChange: " << (int)valueChange << " iter_size: " << dim.iter_size << std::endl;
+        //std::cout << "MOD >>> iter_size: " << dim.iter_size << std::endl;
+        if (dim.iter_size) {
+            dim.setEndOfDimension(false);
+            // std::cout << "REMOVING EOD\n";
+        }
     } else if (target == Target::Stride) {
         dim.iter_stride += valueChange;
         // std::cout << "iter_stride: " << dim.iter_stride << std::endl;
@@ -91,14 +103,15 @@ void dynamicModifier_t::calculateValueChange(auto &target, auto baseValue, dynam
 void dynamicModifier_t::getIndirectRegisterValues() {
     auto &src = (su->registers).at(sourceStream);
     std::visit(overloaded{
-                   [&](auto &reg) { sourceEnd = !reg.getDynModElement(indirectRegisterValue); 
-                   //std::cout << "u" << reg.registerN << "   Getting dyn el\n";
+                   [&](auto &reg) {
+                       sourceEnd = !reg.getDynModElement(indirectRegisterValue);
+                       // std::cout << "u" << reg.registerN << "   Getting dyn el\n";
                    }},
                src);
     /*if (sourceEnd)
         std::cout << "sourceEnd\n";*/
-    //print value
-    //std::cout << "indirectRegisterValue: " << indirectRegisterValue << std::endl;
+    // print value
+    // std::cout << "indirectRegisterValue: " << indirectRegisterValue << std::endl;
 }
 
 void dynamicModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t elementWidth) {
@@ -109,15 +122,15 @@ void dynamicModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t
 
         if (target == Target::Offset) {
             calculateValueChange(dim.iter_offset, dim.offset, behaviour, indirectRegisterValue * elementWidth);
-            //dim.setEndOfDimension(false);
-            //std::cout << "dyn offset: " << indirectRegisterValue << std::endl;
+            // dim.setEndOfDimension(false);
+            // std::cout << "dyn offset: " << indirectRegisterValue << std::endl;
         } else if (target == Target::Size) {
             calculateValueChange(dim.iter_size, dim.size, behaviour, indirectRegisterValue);
-            if (dim.iter_size){
+            if (dim.iter_size) {
                 dim.setEndOfDimension(false);
-                //std::cout << "REMOVING EOD\n";
+                // std::cout << "REMOVING EOD\n";
             }
-            //std::cout << "iter_size: " << dim.iter_size << std::endl;
+            // std::cout << "iter_size: " << dim.iter_size << std::endl;
         } else if (target == Target::Stride) {
             calculateValueChange(dim.iter_stride, dim.stride, behaviour, indirectRegisterValue);
             // std::cout << "iter_stride: " << dim.iter_stride << std::endl;
@@ -130,7 +143,7 @@ void dynamicModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t
     } else {
         dim.setEndOfDimension(true);
         sourceEnd = false;
-        //std::cout << "ACABOU\n";
+        // std::cout << "ACABOU\n";
     }
 }
 
@@ -159,13 +172,14 @@ void scatterGModifier_t::calculateValueChange(auto &target, auto baseValue, dyna
 void scatterGModifier_t::getIndirectRegisterValues() {
     auto &src = (su->registers).at(sourceStream);
     std::visit(overloaded{
-                   [&](auto &reg) { sourceEnd = !reg.getDynModElement(indirectRegisterValue);
-                   //std::cout << "u" << reg.registerN << "   Getting dyn el\n";
+                   [&](auto &reg) {
+                       sourceEnd = !reg.getDynModElement(indirectRegisterValue);
+                       // std::cout << "u" << reg.registerN << "   Getting dyn el\n";
                    }},
                src);
 
-    //print value
-    //std::cout << "sgRegisterValue: " << indirectRegisterValue << std::endl;
+    // print value
+    // std::cout << "sgRegisterValue: " << indirectRegisterValue << std::endl;
 }
 
 void scatterGModifier_t::modDimension(dimension_t &dim, const size_t elementWidth) {
@@ -174,7 +188,7 @@ void scatterGModifier_t::modDimension(dimension_t &dim, const size_t elementWidt
         getIndirectRegisterValues();
 
         calculateValueChange(dim.iter_offset, dim.offset, behaviour, indirectRegisterValue * elementWidth);
-        //dim.setEndOfDimension(false);
+        // dim.setEndOfDimension(false);
 
         /*if (behaviour != dynamicBehaviour::Increment && behaviour != dynamicBehaviour::Decrement)
             dim.iter_size = UINT_MAX;*/
@@ -190,8 +204,8 @@ void scatterGModifier_t::modDimension(dimension_t &dim, const size_t elementWidt
 
     } else {
         dim.setEndOfDimension(true);
-        //sourceEnd = false;
-        //std::cout << "ACABOU sg\n";
+        // sourceEnd = false;
+        // std::cout << "ACABOU sg\n";
     }
 }
 
