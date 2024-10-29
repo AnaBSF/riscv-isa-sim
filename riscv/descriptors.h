@@ -37,8 +37,8 @@ private:
     const size_t offset;
     const size_t size;
     const int stride;
-    size_t iter_offset;
-    size_t iter_size;
+    int iter_offset;
+    int iter_size;
     int iter_stride;
     size_t iter_index;
     bool endOfDimension;

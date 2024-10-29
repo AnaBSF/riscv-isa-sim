@@ -11,7 +11,7 @@ void dimension_t::resetIterValues() {
     iter_stride = stride;
     endOfDimension = iter_size == 0;
 
-    //std::cout << "RESET >>> iter_size: " << iter_size << std::endl;
+    // std::cout << "RESET >>> iter_size: " << iter_size << std::endl;
 }
 
 bool dimension_t::isEmpty() const {
@@ -24,7 +24,7 @@ bool dimension_t::advance() {
         return false;
     }
     ++iter_index;
-    if(iter_index >= iter_size)
+    if (iter_index >= iter_size)
         setEndOfDimension(true);
     //std::cout << "ADVANCE >>> size: " << iter_size << ", idx: " << iter_index << std::endl;
     return true;
@@ -57,17 +57,24 @@ size_t dimension_t::getSize() const {
 /* Start of modifier_t function definitions */
 
 void staticModifier_t::modDimension(std::deque<dimension_t> &dims, const size_t elementWidth) {
-    size_t valueChange = behaviour == staticBehaviour::Increment ? displacement : -1 * displacement;
+    int valueChange = behaviour == staticBehaviour::Increment ? displacement : -1 * displacement;
     dimension_t &dim = dims.at(targetDim);
 
     if (target == Target::Offset) {
         dim.iter_offset += valueChange * elementWidth;
+        if (dim.iter_offset < 0)
+            dim.iter_offset = 0;
         // std::cout << "iter_offset: " << dim.iter_offset << std::endl;
     } else if (target == Target::Size) {
         dim.iter_size += valueChange;
+        if (dim.iter_size <= 0) {
+            dim.iter_size = 0;
+            //std::cout << "MOD >>> iter_size EOD MARKED: " << dim.iter_size << std::endl;
+            dim.setEndOfDimension(true);
+        }
         //std::cout << "MOD >>> iter_size: " << dim.iter_size << std::endl;
         if (dim.iter_size) {
-            dim.setEndOfDimension(false);
+            dim.setEndOfDimension(false); 
             // std::cout << "REMOVING EOD\n";
         }
     } else if (target == Target::Stride) {
