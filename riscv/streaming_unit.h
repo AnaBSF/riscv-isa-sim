@@ -76,6 +76,7 @@ struct streamRegister_t {
     void configureVecDim(const int = -1);
     void startConfiguration(size_t base_address);
     void endConfiguration();
+    void finishStream();
     std::vector<ElementsType> getElements(bool causesUpdate = true);
     bool getDynModElement(int &value);
     void setElements(std::vector<ElementsType> e, bool causesUpdate = true);

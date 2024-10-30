@@ -24,8 +24,10 @@ bool dimension_t::advance() {
         return false;
     }
     ++iter_index;
-    if (iter_index >= iter_size)
+    if (iter_index >= iter_size){
+        //std::cout << "EOD MARKED\n";
         setEndOfDimension(true);
+    }
     //std::cout << "ADVANCE >>> size: " << iter_size << ", idx: " << iter_index << std::endl;
     return true;
 }

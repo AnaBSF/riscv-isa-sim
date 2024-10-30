@@ -20,10 +20,13 @@ auto baseBehaviour = [](auto &dest, auto &src, auto &pred, auto extra) {
 
     std::vector<StorageType> out = destElements; // ??
     for (size_t i = 0; i < validElementsIndex; i++) {
-        if (pi.at((i+1)*sizeof(OperationType)-1))
+        if (pi.at((i+1)*sizeof(OperationType)-1)){
+            //std::cout << "ADD    " << value << " + " << readAS<OperationType>(elements.at(i)) << " = ";
             value += readAS<OperationType>(elements.at(i));
+            //std::cout << value << "\n";
+        }
     }
-    //std::cout << "\n>>> ADDE = " << value << "\n";
+    //std::cout << "\nADDE    " << value << "\n";
     out.at(0) = readAS<StorageType>(value);
     dest.setMode(RegisterMode::Scalar);
     dest.setElements(out);

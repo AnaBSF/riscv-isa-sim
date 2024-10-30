@@ -45,45 +45,9 @@ template <typename T>
 void streamRegister_t<T>::addDimension(dimension_t dim) {
     assert_msg("Cannot append more dimensions as the max value was reached", dimensions.size() < su->maxDimensions);
 
-    // dimensions.push_front(dim);
     dimensions.push_back(dim);
 
     std::unordered_multimap<int, staticModifier_t> updatedModifiers;
-
-    /* Increment all static modifiers' indexes
-    for (auto &m : staticModifiers) {
-        updatedModifiers.insert(std::make_pair(m.first + 1, m.second));
-    }
-
-    staticModifiers.swap(updatedModifiers);
-
-    std::unordered_multimap<int, dynamicModifier_t> updatedModifiers1;
-
-    // Increment all dynamic modifiers' indexes
-    for (auto &m : dynamicModifiers) {
-        updatedModifiers1.insert(std::make_pair(m.first + 1, m.second));
-    }
-
-    dynamicModifiers.swap(updatedModifiers1);
-
-    std::unordered_multimap<int, scatterGModifier_t> updatedModifiers2;
-
-    // Increment all scatter-gather modifiers' indexes
-    for (auto &m : scatterGModifiers) {
-        updatedModifiers2.insert(std::make_pair(m.first + 1, m.second));
-    }
-
-    scatterGModifiers.swap(updatedModifiers2);
-    */
-
-    /* print2 modifiers
-    std::cout << "Modifiers u" << registerN << ": ";
-    for (auto &m : modifiers)
-        std::cout << m.first << "  ";
-    std::cout << std::endl;*/
-
-    // print dimensions size
-    // std::cout << "Dimensions size: " << dimensions.size() << std::endl;
 }
 
 template <typename T>
@@ -98,7 +62,6 @@ template <typename T>
 void streamRegister_t<T>::startConfiguration(size_t base_address) {
     status = RegisterStatus::NotConfigured;
     mode = RegisterMode::Scalar;
-    // validElements = 1;
     baseAddress = base_address;
     dimensions.clear();
 }
@@ -120,13 +83,18 @@ void streamRegister_t<T>::endConfiguration() {
             it->second.modDimension(dimensions, elementWidth);
         }
     }
-    // print scatter-gather modifiers if registerN == 4
-    /*if (registerN == 4) {
-        std::cout << "u" << registerN << "    Scatter-Gather Modifiers: ";
-        for (auto &m : scatterGModifiers)
-            std::cout << m.first << "  ";
-        std::cout << std::endl;
-    }*/
+
+    su->updateEODTable(registerN);
+}
+
+template <typename T>   
+void streamRegister_t<T>::finishStream() {
+    status = RegisterStatus::Finished;
+    type = RegisterConfig::NoStream;
+
+    // Mark all dimensions as finished in EODTable to avoid wrong branching
+    for (dimension_t &dim : dimensions)
+        dim.setEndOfDimension(true);
     su->updateEODTable(registerN);
 }
 
@@ -150,14 +118,6 @@ bool streamRegister_t<T>::getDynModElement(int &value) {
     updateAsLoad();
 
     value = readAS<int>(elements.at(0));
-
-    /* check if any EOD flag is set in EODTable
-    for (auto &eod : su->EODTable.at(registerN)) {
-        if (eod)
-            return 0;
-    }
-
-    return 1;*/
 
     return !hasStreamFinished();
 }
@@ -260,8 +220,8 @@ size_t streamRegister_t<T>::generateAddress() {
 
     return std::accumulate(dimensions.rbegin(), dimensions.rend(), init, [&](size_t acc, dimension_t &dim) {
         if (dim.isLastIteration() && isDimensionFullyDone(dimensions.end() - dimN, dimensions.end())) {
-            /*if (registerN == 3)
-                std::cout << "u" << registerN << "    Setting EOD for dim " << dimensions.size() - dimN  << std::endl;*/
+            /*if (registerN == 7 || registerN == 8)
+                std::cout << "u" << registerN << "    >>> GA Setting EOD for dim " << dimensions.size() - dimN  << std::endl;*/
             dim.setEndOfDimension(true);
         }
         ++dimN;
@@ -297,16 +257,15 @@ bool streamRegister_t<T>::tryGenerateAddress(size_t &address) {
     if (isStreamDone()) {
         /*if (registerN == 3)
             std::cout << "u" << registerN << " Stream is done HERE GENERATE" << std::endl;*/
-        status = RegisterStatus::Finished;
-        type = RegisterConfig::NoStream;
+        finishStream();
         return false;
     }
 
     for (int i = int(dimensions.size() - 1); i >= 0; i--) {
         applySGMods(i);
         if (dimensions.at(i).isEmpty()) {
-            /*if (registerN == 3)
-                std::cout << "u" << registerN << "    Setting EOD for dim " << i + 1 << std::endl;*/
+            /*if (registerN == 7 || registerN == 8)
+                std::cout << "u" << registerN << "    >>> TGA Setting EOD for dim " << i + 1 << std::endl;*/
 
             dimensions.at(i).setEndOfDimension(true);
             return false;
@@ -349,8 +308,7 @@ void streamRegister_t<T>::updateIteration() {
     // std::cout << "u" << registerN << ": Updating iteration STARTED." << std::endl;
 
     if (isStreamDone()) {
-        status = RegisterStatus::Finished;
-        type = RegisterConfig::NoStream;
+        finishStream();
         /*if (registerN == 3)
             std::cout << "u" << registerN << " Stream is done HERE ITER" << std::endl;*/
         return;
@@ -396,7 +354,7 @@ void streamRegister_t<T>::updateIteration() {
             }*/
 
             // Reset EOD flag of current dimension if iteration was successful
-            /*if (registerN == 3)
+            /*if (registerN == 7 || registerN == 8)
                 std::cout << "u" << registerN << "    Removing EOD for dim " << i + 1 << std::endl;*/
 
             currDim.setEndOfDimension(false);
@@ -407,7 +365,7 @@ void streamRegister_t<T>::updateIteration() {
             // setDynamicModsNotApplied(i);
 
             // Iterate upper dimension
-            /*if (registerN == 3)
+            /*if (registerN == 7 || registerN == 8)
                 std::cout << "Updating iteration. Dimension " << i << std::endl;*/
             validIter = nextDim.advance();
             /*if (registerN == 3)
@@ -446,8 +404,7 @@ template <typename T>
 void streamRegister_t<T>::updateAsLoad() {
     assert_msg("Trying to update as load a non-load stream", type == RegisterConfig::Load || type == RegisterConfig::IndSource);
     if (isStreamDone()) { // doesn't try to load if stream has finished
-        status = RegisterStatus::Finished;
-        type = RegisterConfig::NoStream;
+        finishStream();
         /*if (registerN == 3)
             std::cout << "u" << registerN << " Stream is done HERE LOAD" << std::endl;*/
         return;
@@ -484,9 +441,8 @@ void streamRegister_t<T>::updateAsLoad() {
         ++validElements;
         for (size_t i = 0; i < dimensions.size(); i++)
             setSGModsNotApplied(i);
-        if (tryGenerateAddress(offset)) {
+        if (tryGenerateAddress(offset) && ++eCount < max) {
             updateIteration(); // reset EOD flags and iterate stream
-            ++eCount;
         } else {
             break;
         }
@@ -494,13 +450,13 @@ void streamRegister_t<T>::updateAsLoad() {
     su->updateEODTable(registerN); // save current state of the stream so that branches can catch EOD flags
     // std::cout << "eCount: " << eCount << std::endl;
     // std::cout << "vLen: " << vLen << std::endl;
-    if (eCount < max) {    // iteration is already updated when register is full
+    //if (eCount < max) {    // iteration is already updated when register is full
         updateIteration(); // reset EOD flags and iterate stream
         /*for (size_t i = 0; i < dimensions.size() - 1; i++)
             setDynamicModsNotApplied(i, true);*/
         /*for (size_t i = 0; i < dimensions.size(); i++)
             setSGModsNotApplied(i);*/
-    }
+    //}
 }
 
 template <typename T>
@@ -508,8 +464,7 @@ void streamRegister_t<T>::updateAsStore() {
     assert_msg("Trying to update as store a non-store stream", type == RegisterConfig::Store);
     // std::cout << "Updating as store" << std::endl;
     if (isStreamDone()) {
-        status = RegisterStatus::Finished;
-        type = RegisterConfig::NoStream;
+        finishStream();
         return;
     }
     // std::cout << "Storing " << elements.size() << " elements. eCount=" << vLen << std::endl;
@@ -548,6 +503,7 @@ void streamRegister_t<T>::updateAsStore() {
             break;
     }
     // std::cout << std::endl;
+    //std::cout << "UPDATING EODTABLE" <<std::endl;
     su->updateEODTable(registerN); // save current state of the stream so that branches can catch EOD flags
                                    // if (eCount < validElements)       // iteration is already updated when register is full
     updateIteration();             // reset EOD flags and iterate stream
@@ -571,7 +527,7 @@ void streamingUnit_t::updateEODTable(const size_t stream) {
     std::visit([&](const auto reg) {
         int d = 0;
         for (const auto dim : reg.dimensions) {
-            EODTable.at(stream).at(d) = /*reg.vecCfg.at(d) &&*/ dim.isEndOfDimension();
+            EODTable.at(stream).at(d) = dim.isEndOfDimension();
             ++d;
         }
     },
