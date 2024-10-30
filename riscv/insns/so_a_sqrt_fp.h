@@ -26,7 +26,6 @@ auto baseBehaviour = [](auto &dest, auto &src, auto &pred, auto extra) {
                     out.at(i) = readAS<StorageType>(sqrt(e));
                 else
                     out.at(i) = readAS<StorageType>(0.0);
-                //std::cout << "SQRT   " << e << " = " << readAS<OperationType>(out.at(i)) << "\n";
             }
         } else
             out.at(i) = 0; // zeroing out the rest of the elements

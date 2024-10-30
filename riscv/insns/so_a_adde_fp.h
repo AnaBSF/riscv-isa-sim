@@ -26,7 +26,7 @@ auto baseBehaviour = [](auto &dest, auto &src, auto &pred, auto extra) {
     dest.setMode(RegisterMode::Scalar);
     dest.setElements(out);
 
-    std::cout << "ADDE   "<< value << "\n";
+    //std::cout << "ADDE   "<< value << "\n";
 };
 
 // If the destination register is not configured, we have to build it before the operation so that its element size matches before any calculations are done
