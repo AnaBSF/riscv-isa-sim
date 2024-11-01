@@ -33,8 +33,9 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
     auto validElementsIndex = std::min(src1.getValidElements(), src2.getValidElements());
 
     // print number of valid elements
-    //std::cout << "u" << src1.registerN << "    src1 valid elements: " << src1.getValidElements() << "\n";
-    //std::cout << "u" << src2.registerN << "    src2 valid elements: " << src2.getValidElements() << "\n";
+
+    //std::cout << "MUL u" << src1.registerN << "    src1 valid elements: " << src1.getValidElements() << "\n";
+    //std::cout << "MUL u" << src2.registerN << "    src2 valid elements: " << src2.getValidElements() << "\n";
 
     auto pi = pred.getPredicate();
 
@@ -44,7 +45,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
                 OperationType e1 = readAS<OperationType>(elements1.at(i));
                 OperationType e2 = readAS<OperationType>(elements2.at(i));
                 out.at(i) = readAS<StorageType>(OperationType(e1 * e2));
-                std::cout << "MUL   " << e1 << " * " << e2 << " = " << readAS<OperationType>(out.at(i)) << "\n";
+                //std::cout << "MUL   " << e1 << " * " << e2 << " = " << readAS<OperationType>(out.at(i)) << "\n";
             }
         } else if (zeroing)
             out.at(i) = 0; // zeroing out the rest of the elements
@@ -52,7 +53,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
     //dest.setValidIndex(dest.vLen);
     dest.setMode(vLen == 1 ? RegisterMode::Scalar : RegisterMode::Vector);
     dest.setElements(out);
-    std::cout << "\n";
+    //std::cout << "\n";
 };
 
 /* If the destination register is not configured, we have to build it before the

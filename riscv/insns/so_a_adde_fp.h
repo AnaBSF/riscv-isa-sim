@@ -18,15 +18,19 @@ auto baseBehaviour = [](auto &dest, auto &src, auto &pred, auto extra) {
 
     std::vector<StorageType> out = destElements; // ??
 
+    //std::cout << "ADDE   ";
+
     for (size_t i = 0; i < validElementsIndex; i++) {
-        if (pi.at((i+1)*sizeof(OperationType)-1))
+        if (pi.at((i+1)*sizeof(OperationType)-1)){
+            //std::cout << readAS<OperationType>(elements.at(i)) << " + ";
             value += readAS<OperationType>(elements.at(i));
+        }
     }
     out.at(0) = readAS<StorageType>(value);
     dest.setMode(RegisterMode::Scalar);
     dest.setElements(out);
 
-    std::cout << "ADDE   "<< value << "\n";
+    //std::cout << " final   "<< value << "\n";
 };
 
 // If the destination register is not configured, we have to build it before the operation so that its element size matches before any calculations are done

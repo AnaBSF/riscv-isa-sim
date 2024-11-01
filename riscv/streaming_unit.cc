@@ -87,7 +87,7 @@ void streamRegister_t<T>::endConfiguration() {
     su->updateEODTable(registerN);
 }
 
-template <typename T>   
+template <typename T>
 void streamRegister_t<T>::finishStream() {
     status = RegisterStatus::Finished;
     type = RegisterConfig::NoStream;
@@ -219,11 +219,8 @@ size_t streamRegister_t<T>::generateAddress() {
     // std::cout << "u" << registerN << ": Generating address." << std::endl;
 
     return std::accumulate(dimensions.rbegin(), dimensions.rend(), init, [&](size_t acc, dimension_t &dim) {
-        if (dim.isLastIteration() && isDimensionFullyDone(dimensions.end() - dimN, dimensions.end())) {
-            /*if (registerN == 7 || registerN == 8)
-                std::cout << "u" << registerN << "    >>> GA Setting EOD for dim " << dimensions.size() - dimN  << std::endl;*/
+        if (dim.isLastIteration() && isDimensionFullyDone(dimensions.end() - dimN, dimensions.end()))
             dim.setEndOfDimension(true);
-        }
         ++dimN;
         // std::cout << "u" << registerN << "    Calculating address for dim " << dimensions.size() - dimN + 1 << std::endl;
         return acc + dim.calcAddress(elementWidth);
@@ -240,7 +237,7 @@ bool streamRegister_t<T>::isDimensionFullyDone(const std::deque<dimension_t>::co
 
 template <typename T>
 bool streamRegister_t<T>::isStreamDone() const {
-    //return isDimensionFullyDone(dimensions.begin(), dimensions.end());
+    // return isDimensionFullyDone(dimensions.begin(), dimensions.end());
     return dimensions.at(0).isEndOfDimension();
 }
 
@@ -261,21 +258,23 @@ bool streamRegister_t<T>::tryGenerateAddress(size_t &address) {
         return false;
     }
 
+    bool canGenerateAddress = true;
+
     for (int i = int(dimensions.size() - 1); i >= 0; i--) {
         applySGMods(i);
         if (dimensions.at(i).isEmpty()) {
-            /*if (registerN == 7 || registerN == 8)
-                std::cout << "u" << registerN << "    >>> TGA Setting EOD for dim " << i + 1 << std::endl;*/
-
-            dimensions.at(i).setEndOfDimension(true);
-            return false;
+            for (int j = i; j < int(dimensions.size()); j++)
+                dimensions.at(j).setEndOfDimension(true);
+            canGenerateAddress = false;
         }
-        if (i == vecCfgDim && isDimensionFullyDone(dimensions.begin() + i, dimensions.end()))
-            return false;
+        if (i == vecCfgDim && isDimensionFullyDone(dimensions.begin() + i, dimensions.end())){
+            canGenerateAddress =  false;
+            break;
+        }
     }
 
     address = generateAddress();
-    return true;
+    return canGenerateAddress;
 }
 
 template <typename T>
@@ -354,9 +353,6 @@ void streamRegister_t<T>::updateIteration() {
             }*/
 
             // Reset EOD flag of current dimension if iteration was successful
-            /*if (registerN == 7 || registerN == 8)
-                std::cout << "u" << registerN << "    Removing EOD for dim " << i + 1 << std::endl;*/
-
             currDim.setEndOfDimension(false);
 
             auto &nextDim = dimensions.at(i - 1);
@@ -365,8 +361,6 @@ void streamRegister_t<T>::updateIteration() {
             // setDynamicModsNotApplied(i);
 
             // Iterate upper dimension
-            /*if (registerN == 7 || registerN == 8)
-                std::cout << "Updating iteration. Dimension " << i << std::endl;*/
             validIter = nextDim.advance();
             /*if (registerN == 3)
                 std::cout << "u" << registerN << " ValidIter: " << validIter << std::endl;*/
@@ -420,43 +414,47 @@ void streamRegister_t<T>::updateAsLoad() {
     size_t max = mode == RegisterMode::Vector ? vLen : 1;
 
     // std::cout << "u" << registerN << ": Loading values." << std::endl;
+    int g = 0;
+    //do {
+        //std::cout << "u" << registerN << ": Loading values. > " << g++ << std::endl;
+        while (eCount < max && tryGenerateAddress(offset)) {
+            auto value = [this](auto address) -> ElementsType {
+                if constexpr (std::is_same_v<ElementsType, std::uint8_t>)
+                    return readAS<ElementsType>(gMMU(su->p).template load<std::uint8_t>(address));
+                else if constexpr (std::is_same_v<ElementsType, std::uint16_t>)
+                    return readAS<ElementsType>(gMMU(su->p).template load<std::uint16_t>(address));
+                else if constexpr (std::is_same_v<ElementsType, std::uint32_t>)
+                    return readAS<ElementsType>(gMMU(su->p).template load<std::uint32_t>(address));
+                else
+                    return readAS<ElementsType>(gMMU(su->p).template load<std::uint64_t>(address));
+            }(offset);
 
-    while (eCount < max && tryGenerateAddress(offset)) {
-        auto value = [this](auto address) -> ElementsType {
-            if constexpr (std::is_same_v<ElementsType, std::uint8_t>)
-                return readAS<ElementsType>(gMMU(su->p).template load<std::uint8_t>(address));
-            else if constexpr (std::is_same_v<ElementsType, std::uint16_t>)
-                return readAS<ElementsType>(gMMU(su->p).template load<std::uint16_t>(address));
-            else if constexpr (std::is_same_v<ElementsType, std::uint32_t>)
-                return readAS<ElementsType>(gMMU(su->p).template load<std::uint32_t>(address));
-            else
-                return readAS<ElementsType>(gMMU(su->p).template load<std::uint64_t>(address));
-        }(offset);
-
-        // elements.push_back(value);
-        // std::cout << "u" << registerN << "   Loaded Value: " << readAS<double>(value) << std::endl;
-        elements.at(eCount) = value;
-        /*if (registerN==3)
-            std::cout << "u" << registerN << "    Loaded Value: " << readAS<double>(value) << std::endl;*/
-        ++validElements;
-        for (size_t i = 0; i < dimensions.size(); i++)
-            setSGModsNotApplied(i);
-        if (tryGenerateAddress(offset) && ++eCount < max) {
-            updateIteration(); // reset EOD flags and iterate stream
-        } else {
-            break;
+            // elements.push_back(value);
+            /*if (registerN == 3 || registerN == 4)
+                std::cout << "u" << registerN << "   Loaded Value: " << readAS<double>(value) << std::endl;*/
+            elements.at(eCount) = value;
+            /*if (registerN==3)
+                std::cout << "u" << registerN << "    Loaded Value: " << readAS<double>(value) << std::endl;*/
+            ++validElements;
+            for (size_t i = 0; i < dimensions.size(); i++)
+                setSGModsNotApplied(i);
+            if (tryGenerateAddress(offset) && ++eCount < max) {
+                updateIteration(); // reset EOD flags and iterate stream
+            } else {
+                break;
+            }
         }
-    }
-    su->updateEODTable(registerN); // save current state of the stream so that branches can catch EOD flags
-    // std::cout << "eCount: " << eCount << std::endl;
-    // std::cout << "vLen: " << vLen << std::endl;
-    //if (eCount < max) {    // iteration is already updated when register is full
+        su->updateEODTable(registerN); // save current state of the stream so that branches can catch EOD flags
+        // std::cout << "eCount: " << eCount << std::endl;
+        // std::cout << "vLen: " << vLen << std::endl;
+        // if (eCount < max) {    // iteration is already updated when register is full
         updateIteration(); // reset EOD flags and iterate stream
         /*for (size_t i = 0; i < dimensions.size() - 1; i++)
             setDynamicModsNotApplied(i, true);*/
         /*for (size_t i = 0; i < dimensions.size(); i++)
             setSGModsNotApplied(i);*/
-    //}
+        //}
+    //} while (validElements == 0 /*&& tryGenerateAddress(offset)*/);
 }
 
 template <typename T>
@@ -479,35 +477,37 @@ void streamRegister_t<T>::updateAsStore() {
         std::cout << v << " ";
     std::cout << std::endl;
     */
-
-    while (eCount < validElements && tryGenerateAddress(offset)) {
-        // auto value = elements.front();
-        // elements.erase(elements.begin());
-        // elements.pop_front(); //-- std::array
-        auto value = elements.at(eCount);
-        // std::cout << "\nStored Values: " << readAS<double>(value) << " ";
-        if constexpr (std::is_same_v<ElementsType, std::uint8_t>)
-            gMMU(su->p).template store<std::uint8_t>(offset, readAS<ElementsType>(value));
-        else if constexpr (std::is_same_v<ElementsType, std::uint16_t>)
-            gMMU(su->p).template store<std::uint16_t>(offset, readAS<ElementsType>(value));
-        else if constexpr (std::is_same_v<ElementsType, std::uint32_t>)
-            gMMU(su->p).template store<std::uint32_t>(offset, readAS<ElementsType>(value));
-        else
-            gMMU(su->p).template store<std::uint64_t>(offset, readAS<ElementsType>(value));
-        for (size_t i = 0; i < dimensions.size(); i++)
-            setSGModsNotApplied(i);
-        if (tryGenerateAddress(offset) && ++eCount < validElements) {
-            updateIteration(); // reset EOD flags and iterate stream
-            //++eCount;
-        } else
-            break;
-    }
-    // std::cout << std::endl;
-    //std::cout << "UPDATING EODTABLE" <<std::endl;
-    su->updateEODTable(registerN); // save current state of the stream so that branches can catch EOD flags
-                                   // if (eCount < validElements)       // iteration is already updated when register is full
-    updateIteration();             // reset EOD flags and iterate stream
-    // elements.clear();
+    //do {
+        while (eCount < validElements && tryGenerateAddress(offset)) {
+            // auto value = elements.front();
+            // elements.erase(elements.begin());
+            // elements.pop_front(); //-- std::array
+            auto value = elements.at(eCount);
+            // std::cout << "\nStored Values: " << readAS<double>(value) << " ";
+            if constexpr (std::is_same_v<ElementsType, std::uint8_t>)
+                gMMU(su->p).template store<std::uint8_t>(offset, readAS<ElementsType>(value));
+            else if constexpr (std::is_same_v<ElementsType, std::uint16_t>)
+                gMMU(su->p).template store<std::uint16_t>(offset, readAS<ElementsType>(value));
+            else if constexpr (std::is_same_v<ElementsType, std::uint32_t>)
+                gMMU(su->p).template store<std::uint32_t>(offset, readAS<ElementsType>(value));
+            else
+                gMMU(su->p).template store<std::uint64_t>(offset, readAS<ElementsType>(value));
+            for (size_t i = 0; i < dimensions.size(); i++)
+                setSGModsNotApplied(i);
+            ++eCount;
+            if (tryGenerateAddress(offset) && eCount < validElements) {
+                updateIteration(); // reset EOD flags and iterate stream
+                //++eCount;
+            } else
+                break;
+        }
+        // std::cout << std::endl;
+        // std::cout << "UPDATING EODTABLE" <<std::endl;
+        su->updateEODTable(registerN); // save current state of the stream so that branches can catch EOD flags
+                                       // if (eCount < validElements)       // iteration is already updated when register is full
+        updateIteration();             // reset EOD flags and iterate stream
+        // elements.clear();
+    //} while (eCount == 0 /*&& tryGenerateAddress(offset)*/);
 }
 
 std::vector<uint8_t> predRegister_t::getPredicate() const {

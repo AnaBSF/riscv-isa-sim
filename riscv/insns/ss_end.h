@@ -10,10 +10,11 @@ int stride = READ_REG(strideReg);
 std::visit([&](auto &reg) {
     reg.addDimension(dimension_t(offset * reg.elementWidth, size, stride));
     reg.endConfiguration();
-    if( insn.uve_rd() == 8) {
-    std::cout << "base: " << offset << "\n";
-    std::cout << "size: " << size << "\n";
-    std::cout << "stride: " << stride << "\n";
-    }
+    /*if (insn.uve_rd() == 12 || insn.uve_rd() == 5) {
+        std::cout << "u" << insn.uve_rd() << ": ";
+        std::cout << "base: " << offset << "\n";
+        std::cout << "size: " << size << "\n";
+        std::cout << "stride: " << stride << "\n";
+    }*/
 },
            destReg);

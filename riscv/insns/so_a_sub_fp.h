@@ -32,7 +32,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
                 OperationType e1 = readAS<OperationType>(elements1.at(i));
                 OperationType e2 = readAS<OperationType>(elements2.at(i));
                 out.at(i) = readAS<StorageType>(OperationType(e1 - e2));
-                std::cout << "SUB   " << e1 << " - " << e2 << " = " << readAS<OperationType>(out.at(i)) << "\n";
+                //std::cout << "SUB   " << e1 << " - " << e2 << " = " << readAS<OperationType>(out.at(i)) << "\n";
             }
         } else if (zeroing)
             out.at(i) = 0; // zeroing out the rest of the elements
@@ -40,7 +40,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
     //dest.setValidIndex(dest.vLen);
     dest.setMode(vLen == 1 ? RegisterMode::Scalar : RegisterMode::Vector);
     dest.setElements(out);
-    std::cout << "\n\n";
+    //std::cout << "\n\n";
 };
 
 /* If the destination register is not configured, we have to build it before the
