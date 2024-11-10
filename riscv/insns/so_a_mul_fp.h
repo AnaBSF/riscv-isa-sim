@@ -46,6 +46,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
                 OperationType e2 = readAS<OperationType>(elements2.at(i));
                 out.at(i) = readAS<StorageType>(OperationType(e1 * e2));
                 //std::cout << "MUL   " << e1 << " * " << e2 << " = " << readAS<OperationType>(out.at(i)) << "\n";
+                //printf("MUL    %.4lf * %.4lf = %.4lf\n", e1, e2, readAS<OperationType>(out.at(i)));
             }
         } else if (zeroing)
             out.at(i) = 0; // zeroing out the rest of the elements

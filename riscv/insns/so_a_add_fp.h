@@ -11,7 +11,7 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
     /* Each stream's elements must have the same width for content to be
      * operated on */
     assert_msg("Given vectors have different widths", src1.getElementWidth() == src2.getElementWidth());
-    size_t vLen = src1.getMode() == RegisterMode::Scalar || src2.getMode() == RegisterMode::Scalar ? 1 : dest.getVLen();
+    size_t vLen = src1.getMode() == RegisterMode::Scalar || src2.getMode() == RegisterMode::Scalar ? 1 : dest.getVLen(); 
     bool zeroing = src1.getPredMode() == PredicateMode::Zeroing && src2.getPredMode() == PredicateMode::Zeroing;
     /* We can only operate on the first available values of the stream */
     auto elements1 = src1.getElements();
@@ -25,6 +25,9 @@ auto baseBehaviour = [](auto &dest, auto &src1, auto &src2, auto &pred, auto ext
     auto validElementsIndex = std::min(src1.getValidElements(), src2.getValidElements());
 
     auto pi = pred.getPredicate();
+
+    //std::cout << "ADD validElements: src1: " << src1.getValidElements() << " src2: " << src2.getValidElements() << " dest:" << vLen << "\n";
+
 
     for (size_t i = 0; i < vLen; i++) {
         if (i < validElementsIndex){

@@ -16,7 +16,7 @@ auto baseBehaviour = [](auto &dest, auto &pred, const auto value) {
     for (size_t i = 0; i < destValidIndex; ++i)
         out.at(i) = pi.at((i+1)*sizeof(uint32_t)-1) ? value : destElements.at(i);
 
-    dest.setValidIndex(destValidIndex);
+    dest.setMode(RegisterMode::Vector);
     dest.setElements(out);
 };
 
