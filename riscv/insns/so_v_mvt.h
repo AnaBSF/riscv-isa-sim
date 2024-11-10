@@ -3,26 +3,30 @@ auto &destReg = P.SU.registers[streamReg];
 auto &srcReg = P.SU.registers[insn.uve_rs1()];
 auto &predReg = P.SU.predicates[insn.uve_v_pred()];
 
-
 auto baseBehaviour = [](auto &dest, auto &src, auto &pred) {
     using StorageType = typename std::remove_reference_t<decltype(dest)>::ElementsType;
     /* We can only operate on the first available values of the stream */
     auto validElementsIndex = src.getValidElements();
-
+    bool zeroing = src.getPredMode() == PredicateMode::Zeroing;
+    size_t vLen = src.getMode() == RegisterMode::Scalar ? 1 : dest.getVLen();
     auto elements = src.getElements();
-    std::reverse(elements.begin(), elements.begin()+validElementsIndex); // reverse the valid source elements
+    std::reverse(elements.begin(), elements.begin() + validElementsIndex); // reverse the valid source elements
 
     auto destElements = dest.getElements(false); // doesn't iterate the stream
 
     std::vector<StorageType> out(dest.getVLen());
 
     auto pi = pred.getPredicate();
-    std::reverse(pi.begin(), pi.begin()+validElementsIndex*sizeof(StorageType)); // reverse the necessary instruction predicate
+    std::reverse(pi.begin(), pi.begin() + validElementsIndex * sizeof(StorageType)); // reverse the necessary instruction predicate
 
-    for (size_t i = 0; i < validElementsIndex; ++i)
-        out.at(i) = pi.at((i+1)*sizeof(StorageType)-1) ? elements.at(i) : destElements.at(i);
+    for (size_t i = 0; i < vLen; ++i) {
+        if (i < validElementsIndex)
+            out.at(i) = pi.at((i + 1) * sizeof(StorageType) - 1) ? elements.at(i) : destElements.at(i);
+        else if (zeroing)
+            out.at(i) = 0;
+    }
 
-    dest.setValidIndex(validElementsIndex);
+    dest.setMode(vLen == 1 ? RegisterMode::Scalar : RegisterMode::Vector);
     dest.setElements(out);
 };
 
@@ -32,21 +36,22 @@ std::visit([&](auto &dest) {
     if (dest.getStatus() == RegisterStatus::NotConfigured) {
         if (std::holds_alternative<StreamReg64>(srcReg)) {
             P.SU.makeStreamRegister<std::uint64_t>(streamReg);
-			dest.endConfiguration();
+            dest.endConfiguration();
         } else if (std::holds_alternative<StreamReg32>(srcReg)) {
             P.SU.makeStreamRegister<std::uint32_t>(streamReg);
-			dest.endConfiguration();
+            dest.endConfiguration();
         } else if (std::holds_alternative<StreamReg16>(srcReg)) {
             P.SU.makeStreamRegister<std::uint16_t>(streamReg);
-			dest.endConfiguration();
+            dest.endConfiguration();
         } else if (std::holds_alternative<StreamReg8>(srcReg)) {
             P.SU.makeStreamRegister<std::uint8_t>(streamReg);
-			dest.endConfiguration();
+            dest.endConfiguration();
         } else {
             assert_msg("Trying to run so.v.mvt with invalid src type", false);
         }
     }
-}, destReg);
+},
+           destReg);
 
 std::visit(overloaded{
                [&](StreamReg64 &dest, StreamReg64 &src) { baseBehaviour(dest, src, predReg); },

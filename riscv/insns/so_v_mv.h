@@ -10,16 +10,21 @@ auto baseBehaviour = [](auto &dest, auto &src, auto &pred) {
     auto elements = src.getElements();
     auto destElements = dest.getElements(false); // doesn't iterate the stream
     auto validElementsIndex = src.getValidElements();
+    bool zeroing = src.getPredMode() == PredicateMode::Zeroing;
+    size_t vLen = src.getMode() == RegisterMode::Scalar ? 1 : dest.getVLen();
     std::vector<StorageType> out(dest.getVLen());
     auto pi = pred.getPredicate();
 
     //std::cout << "MV   ";
-    for (size_t i = 0; i < validElementsIndex; ++i){
-        out.at(i) = pi.at((i+1)*sizeof(StorageType)-1) ? elements.at(i) : destElements.at(i);
-        //std::cout << "MV[" << i << "]   " << readAS<double>(out.at(i)) << "\n";
+    for (size_t i = 0; i < vLen; ++i){
+        if (i < validElementsIndex)
+            out.at(i) = pi.at((i+1)*sizeof(StorageType)-1) ? elements.at(i) : destElements.at(i);
+            //std::cout << "MV[" << i << "]   " << readAS<double>(out.at(i)) << "\n";
+        else if (zeroing)
+            out.at(i) = 0;
     }
     //std::cout << "\n";
-    dest.setValidIndex(validElementsIndex);
+    dest.setMode(vLen == 1 ? RegisterMode::Scalar : RegisterMode::Vector);
     dest.setElements(out);
     //std::cout << "\n\n";
 };
