@@ -1160,21 +1160,21 @@ riscv_insn_ext_uve = \
 	so_a_srls \
 	so_a_xor \
 	so_b_c \
-	so_b_dc_1 \
 	so_b_dc_2 \
 	so_b_dc_3 \
 	so_b_dc_4 \
 	so_b_dc_5 \
 	so_b_dc_6 \
 	so_b_dc_7 \
+	so_b_dc_8 \
 	so_b_nc \
-	so_b_ndc_1 \
 	so_b_ndc_2 \
 	so_b_ndc_3 \
 	so_b_ndc_4 \
 	so_b_ndc_5 \
 	so_b_ndc_6 \
 	so_b_ndc_7 \
+	so_b_ndc_8 \
 	so_p_cv_b_h \
 	so_p_cv_b_w \
 	so_p_cv_b_d \
