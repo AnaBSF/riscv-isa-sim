@@ -7,4 +7,4 @@ autom4te.cache/
 .gdb_history
 .#*
 *~
-.vscode/settings.json
+config.log
