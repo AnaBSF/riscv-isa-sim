@@ -44,13 +44,15 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
              const char *log_path,
              bool dtb_enabled, const char *dtb_file,
              bool socket_enabled,
-             FILE *cmd_file) // needed for command line option --cmd
+             FILE *cmd_file, // needed for command line option --cmd
+             std::optional<unsigned long long> instruction_limit)
   : htif_t(args),
     cfg(cfg),
     mems(mems),
     dtb_enabled(dtb_enabled),
     log_file(log_path),
     cmd_file(cmd_file),
+    instruction_limit(instruction_limit),
     sout_(nullptr),
     current_step(0),
     current_proc(0),
@@ -135,7 +137,6 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
     dtb = strstream.str();
     dts = dtb_to_dts(dtb);
   } else {
-    std::pair<reg_t, reg_t> initrd_bounds = cfg->initrd_bounds;
     std::string device_nodes;
     for (const device_factory_sargs_t& factory_sargs: device_factories) {
       const device_factory_t* factory = factory_sargs.first;
@@ -235,6 +236,8 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
     } else {
       procs[cpu_idx]->set_mmu_capability(IMPL_MMU_SBARE);
     }
+
+    procs[cpu_idx]->reset();
 
     cpu_idx++;
   }
@@ -402,10 +405,9 @@ void sim_t::set_rom()
 char* sim_t::addr_to_mem(reg_t paddr) {
   if (!paddr_ok(paddr))
     return NULL;
-  auto desc = bus.find_device(paddr);
+  auto desc = bus.find_device(paddr >> PGSHIFT << PGSHIFT, PGSIZE);
   if (auto mem = dynamic_cast<abstract_mem_t*>(desc.second))
-    if (paddr - desc.first < mem->size())
-      return mem->contents(paddr - desc.first);
+    return mem->contents(paddr - desc.first);
   return NULL;
 }
 
@@ -429,8 +431,19 @@ void sim_t::idle()
 
   if (debug || ctrlc_pressed)
     interactive();
-  else
+  else {
+    if (instruction_limit.has_value()) {
+      if (*instruction_limit < INTERLEAVE) {
+        // Final step.
+        step(*instruction_limit);
+        htif_exit(0);
+        *instruction_limit = 0;
+        return;
+      }
+      *instruction_limit -= INTERLEAVE;
+    }
     step(INTERLEAVE);
+  }
 
   if (remote_bitbang)
     remote_bitbang->tick();
