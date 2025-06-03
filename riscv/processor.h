@@ -70,6 +70,7 @@ typedef std::vector<std::tuple<reg_t, uint64_t, uint8_t>> commit_log_mem_t;
 // architectural state of a RISC-V hart
 struct state_t
 {
+  void add_ireg_proxy(processor_t* const proc, sscsrind_reg_csr_t::sscsrind_reg_csr_t_p ireg);
   void reset(processor_t* const proc, reg_t max_isa);
   void add_csr(reg_t addr, const csr_t_p& csr);
 
@@ -96,6 +97,8 @@ struct state_t
   wide_counter_csr_t_p mcycle;
   mie_csr_t_p mie;
   mip_csr_t_p mip;
+  csr_t_p nonvirtual_sip;
+  csr_t_p nonvirtual_sie;
   csr_t_p medeleg;
   csr_t_p mideleg;
   csr_t_p mcounteren;
@@ -173,6 +176,11 @@ struct state_t
 
   csr_t_p ssp;
 
+  csr_t_p mvien;
+  mvip_csr_t_p mvip;
+  csr_t_p hvictl;
+  csr_t_p vstopi;
+
   bool serialized; // whether timer CSRs are in a well-defined state
 
   // When true, execute a single instruction and then enter debug mode.  This
@@ -249,8 +257,8 @@ public:
               FILE *log_file, std::ostream& sout_); // because of command line option --log and -s we need both
   ~processor_t();
 
-  const isa_parser_t &get_isa() { return isa; }
-  const cfg_t &get_cfg() { return *cfg; }
+  const isa_parser_t &get_isa() const & { return isa; }
+  const cfg_t &get_cfg() const & { return *cfg; }
 
   void set_debug(bool value);
   void set_histogram(bool value);
@@ -327,7 +335,7 @@ public:
   }
   reg_t legalize_privilege(reg_t);
   void set_privilege(reg_t, bool);
-  const char* get_privilege_string();
+  const char* get_privilege_string() const;
   void update_histogram(reg_t pc);
   const disassembler_t* get_disassembler() { return disassembler; }
 
@@ -349,8 +357,8 @@ public:
   // When true, display disassembly of each instruction that's executed.
   bool debug;
   // When true, take the slow simulation path.
-  bool slow_path();
-  bool halted() { return state.debug_mode; }
+  bool slow_path() const;
+  bool halted() const { return state.debug_mode; }
   enum {
     HR_NONE,    /* Halt request is inactive. */
     HR_REGULAR, /* Regular halt request/debug interrupt. */
@@ -369,6 +377,8 @@ public:
   bool is_waiting_for_interrupt() { return in_wfi; };
 
   void check_if_lpad_required();
+
+  reg_t select_an_interrupt_with_default_priority(reg_t enabled_interrupts) const;
 
 private:
   const isa_parser_t isa;
@@ -402,6 +412,7 @@ private:
   static const size_t OPCODE_CACHE_SIZE = 4095;
   opcode_cache_entry_t opcode_cache[OPCODE_CACHE_SIZE];
 
+  bool is_handled_in_vs();
   void take_pending_interrupt() { take_interrupt(state.mip->read() & state.mie->read()); }
   void take_interrupt(reg_t mask); // take first enabled interrupt in mask
   void take_trap(trap_t& t, reg_t epc); // take an exception

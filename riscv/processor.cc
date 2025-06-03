@@ -34,7 +34,8 @@ processor_t::processor_t(const char* isa_str, const char* priv_str,
                          const cfg_t *cfg,
                          simif_t* sim, uint32_t id, bool halt_on_reset,
                          FILE* log_file, std::ostream& sout_)
-: debug(false), halt_request(HR_NONE), isa(isa_str, priv_str), cfg(cfg), sim(sim), id(id), xlen(0),
+: debug(false), halt_request(HR_NONE), isa(isa_str, priv_str), cfg(cfg),
+  sim(sim), id(id), xlen(isa.get_max_xlen()),
   histogram_enabled(false), log_commits_enabled(false),
   log_file(log_file), sout_(sout_.rdbuf()), halt_on_reset(halt_on_reset),
   in_wfi(false), check_triggers_icount(false),
@@ -62,7 +63,7 @@ processor_t::processor_t(const char* isa_str, const char* priv_str,
   VU.vstart_alu = 0;
 
   register_base_instructions();
-  mmu = new mmu_t(sim, cfg->endianness, this);
+  mmu = new mmu_t(sim, cfg->endianness, this, cfg->cache_blocksz);
 
   disassembler = new disassembler_t(&isa);
   for (auto e : isa.get_extensions())
@@ -144,6 +145,7 @@ void processor_t::set_histogram(bool value)
 void processor_t::enable_log_commits()
 {
   log_commits_enabled = true;
+  mmu->flush_tlb(); // the TLB caches this setting
 }
 
 void processor_t::reset()
@@ -240,10 +242,73 @@ void processor_t::set_mmu_capability(int cap)
   }
 }
 
+reg_t processor_t::select_an_interrupt_with_default_priority(reg_t enabled_interrupts) const
+{
+  // nonstandard interrupts have highest priority
+  if (enabled_interrupts >> (IRQ_LCOF + 1))
+    enabled_interrupts = enabled_interrupts >> (IRQ_LCOF + 1) << (IRQ_LCOF + 1);
+  // standard interrupt priority is MEI, MSI, MTI, SEI, SSI, STI
+  else if (enabled_interrupts & MIP_MEIP)
+    enabled_interrupts = MIP_MEIP;
+  else if (enabled_interrupts & MIP_MSIP)
+    enabled_interrupts = MIP_MSIP;
+  else if (enabled_interrupts & MIP_MTIP)
+    enabled_interrupts = MIP_MTIP;
+  else if (enabled_interrupts & MIP_SEIP)
+    enabled_interrupts = MIP_SEIP;
+  else if (enabled_interrupts & MIP_SSIP)
+    enabled_interrupts = MIP_SSIP;
+  else if (enabled_interrupts & MIP_STIP)
+    enabled_interrupts = MIP_STIP;
+  else if (enabled_interrupts & MIP_LCOFIP)
+    enabled_interrupts = MIP_LCOFIP;
+  else if (enabled_interrupts & MIP_VSEIP)
+    enabled_interrupts = MIP_VSEIP;
+  else if (enabled_interrupts & MIP_VSSIP)
+    enabled_interrupts = MIP_VSSIP;
+  else if (enabled_interrupts & MIP_VSTIP)
+    enabled_interrupts = MIP_VSTIP;
+
+  return enabled_interrupts;
+}
+
+bool processor_t::is_handled_in_vs()
+{
+  reg_t pending_interrupts = state.mip->read() & state.mie->read();
+
+  const reg_t s_pending_interrupts = state.nonvirtual_sip->read() & state.nonvirtual_sie->read();
+  const reg_t vstopi = state.vstopi->read();
+  const reg_t vs_pending_interrupt = vstopi ? (reg_t(1) << get_field(vstopi, MTOPI_IID)) : 0; // SSIP -> VSSIP, etc
+
+  // M-ints have higher priority over HS-ints and VS-ints
+  const reg_t mie = get_field(state.mstatus->read(), MSTATUS_MIE);
+  const reg_t m_enabled = state.prv < PRV_M || (state.prv == PRV_M && mie);
+  reg_t enabled_interrupts = pending_interrupts & ~state.mideleg->read() & -m_enabled;
+  if (enabled_interrupts == 0) {
+    // HS-ints have higher priority over VS-ints
+    const reg_t deleg_to_hs = state.mideleg->read() & ~state.hideleg->read();
+    const reg_t sie = get_field(state.sstatus->read(), MSTATUS_SIE);
+    const reg_t hs_enabled = state.v || state.prv < PRV_S || (state.prv == PRV_S && sie);
+    enabled_interrupts = ((pending_interrupts & deleg_to_hs) | (s_pending_interrupts & ~state.hideleg->read())) & -hs_enabled;
+    if (state.v && enabled_interrupts == 0) {
+      // VS-ints have least priority and can only be taken with virt enabled
+      const reg_t vs_enabled = state.prv < PRV_S || (state.prv == PRV_S && sie);
+      enabled_interrupts = vs_pending_interrupt & -vs_enabled;
+      if (enabled_interrupts)
+        return true;
+    }
+  }
+  return false;
+}
+
 void processor_t::take_interrupt(reg_t pending_interrupts)
 {
+  const reg_t s_pending_interrupts = state.nonvirtual_sip->read() & state.nonvirtual_sie->read();
+  const reg_t vstopi = state.vstopi->read();
+  const reg_t vs_pending_interrupt = vstopi ? (reg_t(1) << get_field(vstopi, MTOPI_IID)) : 0;
+
   // Do nothing if no pending interrupts
-  if (!pending_interrupts) {
+  if (!pending_interrupts && !s_pending_interrupts && !vs_pending_interrupt) {
     return;
   }
 
@@ -259,46 +324,20 @@ void processor_t::take_interrupt(reg_t pending_interrupts)
     const reg_t deleg_to_hs = state.mideleg->read() & ~state.hideleg->read();
     const reg_t sie = get_field(state.sstatus->read(), MSTATUS_SIE);
     const reg_t hs_enabled = state.v || state.prv < PRV_S || (state.prv == PRV_S && sie);
-    enabled_interrupts = pending_interrupts & deleg_to_hs & -hs_enabled;
+    enabled_interrupts = ((pending_interrupts & deleg_to_hs) | (s_pending_interrupts & ~state.hideleg->read())) & -hs_enabled;
     if (state.v && enabled_interrupts == 0) {
       // VS-ints have least priority and can only be taken with virt enabled
-      const reg_t deleg_to_vs = state.hideleg->read();
       const reg_t vs_enabled = state.prv < PRV_S || (state.prv == PRV_S && sie);
-      enabled_interrupts = pending_interrupts & deleg_to_vs & -vs_enabled;
+      enabled_interrupts = vs_pending_interrupt & -vs_enabled;
     }
   }
 
   const bool nmie = !(state.mnstatus && !get_field(state.mnstatus->read(), MNSTATUS_NMIE));
   if (!state.debug_mode && nmie && enabled_interrupts) {
-    // nonstandard interrupts have highest priority
-    if (enabled_interrupts >> (IRQ_LCOF + 1))
-      enabled_interrupts = enabled_interrupts >> (IRQ_LCOF + 1) << (IRQ_LCOF + 1);
-    // standard interrupt priority is MEI, MSI, MTI, SEI, SSI, STI
-    else if (enabled_interrupts & MIP_MEIP)
-      enabled_interrupts = MIP_MEIP;
-    else if (enabled_interrupts & MIP_MSIP)
-      enabled_interrupts = MIP_MSIP;
-    else if (enabled_interrupts & MIP_MTIP)
-      enabled_interrupts = MIP_MTIP;
-    else if (enabled_interrupts & MIP_SEIP)
-      enabled_interrupts = MIP_SEIP;
-    else if (enabled_interrupts & MIP_SSIP)
-      enabled_interrupts = MIP_SSIP;
-    else if (enabled_interrupts & MIP_STIP)
-      enabled_interrupts = MIP_STIP;
-    else if (enabled_interrupts & MIP_LCOFIP)
-      enabled_interrupts = MIP_LCOFIP;
-    else if (enabled_interrupts & MIP_VSEIP)
-      enabled_interrupts = MIP_VSEIP;
-    else if (enabled_interrupts & MIP_VSSIP)
-      enabled_interrupts = MIP_VSSIP;
-    else if (enabled_interrupts & MIP_VSTIP)
-      enabled_interrupts = MIP_VSTIP;
-    else
-      abort();
+    reg_t selected_interrupt = select_an_interrupt_with_default_priority(enabled_interrupts);
 
     if (check_triggers_icount) TM.detect_icount_match();
-    throw trap_t(((reg_t)1 << (isa.get_max_xlen() - 1)) | ctz(enabled_interrupts));
+    throw trap_t(((reg_t)1 << (isa.get_max_xlen() - 1)) | ctz(selected_interrupt));
   }
 }
 
@@ -326,7 +365,7 @@ void processor_t::set_privilege(reg_t prv, bool virt)
   state.v_changed = state.v != state.prev_v;
 }
 
-const char* processor_t::get_privilege_string()
+const char* processor_t::get_privilege_string() const
 {
   if (state.debug_mode)
     return "D";
@@ -402,7 +441,7 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
   bool supv_double_trap = false;
   if (interrupt) {
     vsdeleg = (curr_virt && state.prv <= PRV_S) ? state.hideleg->read() : 0;
-    hsdeleg = (state.prv <= PRV_S) ? state.mideleg->read() : 0;
+    hsdeleg = (state.prv <= PRV_S) ? (state.mideleg->read() | state.nonvirtual_sip->read()) : 0;
     bit &= ~((reg_t)1 << (max_xlen - 1));
   } else {
     vsdeleg = (curr_virt && state.prv <= PRV_S) ? (state.medeleg->read() & state.hedeleg->read()) : 0;
@@ -419,9 +458,9 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
     if (supv_double_trap)
       vsdeleg = hsdeleg = 0;
   }
-  if (state.prv <= PRV_S && bit < max_xlen && ((vsdeleg >> bit) & 1)) {
+  if ((state.prv <= PRV_S && bit < max_xlen && ((vsdeleg >> bit) & 1)) || (state.v && interrupt && is_handled_in_vs())) {
     // Handle the trap in VS-mode
-    const reg_t adjusted_cause = interrupt ? bit - 1 : bit;  // VSSIP -> SSIP, etc
+    const reg_t adjusted_cause = bit;
     reg_t vector = (state.vstvec->read() & 1) && interrupt ? 4 * adjusted_cause : 0;
     state.pc = (state.vstvec->read() & ~(reg_t)1) + vector;
     state.vscause->write(adjusted_cause | (interrupt ? interrupt_bit : 0));

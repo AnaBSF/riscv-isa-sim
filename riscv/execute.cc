@@ -201,7 +201,7 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
   return npc;
 }
 
-bool processor_t::slow_path()
+bool processor_t::slow_path() const
 {
   return debug || state.single_step != state.STEP_NONE || state.debug_mode ||
          log_commits_enabled || histogram_enabled || in_wfi || check_triggers_icount;
@@ -342,10 +342,6 @@ void processor_t::step(size_t n)
     }
     catch (triggers::matched_t& t)
     {
-      if (mmu->matched_trigger) {
-        delete mmu->matched_trigger;
-        mmu->matched_trigger = NULL;
-      }
       take_trigger_action(t.action, t.address, pc, t.gva);
     }
     catch(trap_debug_mode&)
