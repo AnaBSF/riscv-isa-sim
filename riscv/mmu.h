@@ -3,6 +3,7 @@
 #ifndef _RISCV_MMU_H
 #define _RISCV_MMU_H
 
+#include "bloom_filter.h"
 #include "decode.h"
 #include "trap.h"
 #include "common.h"
@@ -18,7 +19,6 @@
 // virtual memory configuration
 #define PGSHIFT 12
 const reg_t PGSIZE = 1 << PGSHIFT;
-#define MAX_PADDR_BITS 64
 
 // observability hooks for load, store and fetch
 // intentionally empty not to cause runtime overhead
@@ -43,7 +43,6 @@ struct insn_fetch_t
 
 struct icache_entry_t {
   reg_t tag;
-  struct icache_entry_t* next;
   insn_fetch_t data;
 };
 
@@ -79,6 +78,7 @@ struct mem_access_info_t {
 };
 
 void throw_access_exception(bool virt, reg_t addr, access_type type);
+[[noreturn]] void throw_page_fault_exception(bool virt, reg_t addr, access_type type);
 
 // this class implements a processor's port into the virtual memory system.
 // an MMU and instruction cache are maintained for simulator performance.
@@ -292,7 +292,7 @@ public:
     return have_reservation;
   }
 
-  static const reg_t ICACHE_ENTRIES = 1024;
+  static const reg_t ICACHE_ENTRIES = 4096;
 
   inline size_t icache_index(reg_t addr)
   {
@@ -303,7 +303,7 @@ public:
   T ALWAYS_INLINE fetch_jump_table(reg_t addr) {
     T res = 0;
     for (size_t i = 0; i < sizeof(T) / sizeof(insn_parcel_t); i++)
-      res |= (T)fetch_insn_parcel(addr + i * sizeof(insn_parcel_t)) << (i * sizeof(insn_parcel_t));
+      res |= (T)fetch_insn_parcel(addr + i * sizeof(insn_parcel_t)) << (i * sizeof(insn_parcel_t) * 8);
 
     // table accesses use data endianness, not instruction (little) endianness
     return target_big_endian ? to_be(res) : res;
@@ -312,26 +312,15 @@ public:
   inline icache_entry_t* refill_icache(reg_t addr, icache_entry_t* entry)
   {
     insn_bits_t insn = fetch_insn_parcel(addr);
+    unsigned length = insn_length(insn);
 
-    int length = insn_length(insn);
-
-    if (likely(length == 4)) {
-      insn |= (insn_bits_t)fetch_insn_parcel(addr + 2) << 16;
-    } else if (length == 2) {
-      // entire instruction already fetched
-    } else if (length == 6) {
-      insn |= (insn_bits_t)fetch_insn_parcel(addr + 2) << 16;
-      insn |= (insn_bits_t)fetch_insn_parcel(addr + 4) << 32;
-    } else {
-      static_assert(sizeof(insn_bits_t) == 8, "insn_bits_t must be uint64_t");
-      insn |= (insn_bits_t)fetch_insn_parcel(addr + 2) << 16;
-      insn |= (insn_bits_t)fetch_insn_parcel(addr + 4) << 32;
-      insn |= (insn_bits_t)fetch_insn_parcel(addr + 6) << 48;
+    for (unsigned pos = sizeof(insn_parcel_t); pos < length; pos += sizeof(insn_parcel_t)) {
+      insn |= fetch_insn_parcel(addr + pos) << (8 * pos);
+      length = insn_length(insn);
     }
 
     insn_fetch_t fetch = {proc->decode_insn(insn), insn};
     entry->tag = addr;
-    entry->next = &icache[icache_index(addr + length)];
     entry->data = fetch;
 
     auto [check_tracer, _, paddr] = access_tlb(tlb_insn, addr, TLB_FLAGS, TLB_CHECK_TRACER);
@@ -419,6 +408,14 @@ private:
   dtlb_entry_t tlb_store[TLB_ENTRIES];
   dtlb_entry_t tlb_insn[TLB_ENTRIES];
 
+  typedef bloom_filter_t<reg_t, simple_hash1, simple_hash2, TLB_ENTRIES * 16, 3> reverse_tags_t;
+  reverse_tags_t tlb_store_reverse_tags;
+  reverse_tags_t tlb_insn_reverse_tags;
+
+  bool flush_tlb_ppn(reg_t ppn, dtlb_entry_t* tlb, reverse_tags_t& filter);
+  void flush_itlb_ppn(reg_t ppn);
+  void flush_stlb_ppn(reg_t ppn);
+
   // finish translation on a TLB miss and update the TLB
   tlb_entry_t refill_tlb(reg_t vaddr, reg_t paddr, char* host_addr, access_type type);
   const char* fill_from_mmio(reg_t vaddr, reg_t paddr);
@@ -448,6 +445,7 @@ private:
     check_triggers(operation, address, virt, address, data);
   }
   void check_triggers(triggers::operation_t operation, reg_t address, bool virt, reg_t tval, std::optional<reg_t> data);
+  bool check_svukte_qualified(reg_t addr, reg_t mode, bool forced_virt);
   reg_t translate(mem_access_info_t access_info, reg_t len);
 
   reg_t pte_load(reg_t pte_paddr, reg_t addr, bool virt, access_type trap_type, size_t ptesize) {
@@ -508,7 +506,7 @@ private:
   {
     return proc != nullptr
            && !(proc->state.mnstatus && !get_field(proc->state.mnstatus->read(), MNSTATUS_NMIE))
-           && !proc->state.debug_mode
+           && (!proc->state.debug_mode || get_field(proc->state.dcsr->read(), DCSR_MPRVEN))
            && get_field(proc->state.mstatus->read(), MSTATUS_MPRV);
   }
 

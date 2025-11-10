@@ -33,11 +33,13 @@ riscv_install_hdrs = \
 	entropy_source.h \
 	extension.h \
 	isa_parser.h \
+	jtag_dtm.h \
 	log_file.h \
 	memtracer.h \
 	mmu.h \
 	platform.h \
 	processor.h \
+	remote_bitbang.h \
 	rocc.h \
 	sim.h \
 	simif.h \
@@ -963,6 +965,14 @@ riscv_insn_ext_zicond = \
 	czero_eqz \
 	czero_nez \
 
+riscv_insn_ext_zvfofp4min = \
+	vfext_vf2 \
+
+riscv_insn_ext_zvfofp8min = \
+	vfncvt_f_f_q \
+	vfncvt_sat_f_f_q \
+	vfncvtbf16_sat_f_f_w \
+
 riscv_insn_ext_zfbfmin = \
 	fcvt_bf16_s \
 	fcvt_s_bf16 \
@@ -1077,9 +1087,28 @@ riscv_insn_ext_zvksh = \
 	vsm3c_vi \
 	vsm3me_vv \
 
+riscv_insn_ext_zvbdot = \
+	vqbdotu_vv \
+	vqbdots_vv \
+	vfwbdot_vv \
+	vfbdot_vv \
+	vfqbdot_vv \
+	vfqbdot_alt_vv \
+
+riscv_insn_ext_zvldot = \
+	vqldotu_vv \
+	vqldots_vv \
+	vfwldot_vv \
+	vfqldot_vv \
+	vfqldot_alt_vv \
+
 riscv_insn_ext_zimop = \
 	mop_r_N \
 	mop_rr_N \
+
+riscv_insn_ext_zibi = \
+	beqi \
+	bnei \
 
 riscv_insn_ext_zcmop = \
 	c_mop_N \
@@ -1557,6 +1586,8 @@ riscv_insn_list = \
 	$(riscv_insn_ext_b) \
 	$(riscv_insn_ext_a) \
 	$(if $(HAVE_INT128),$(riscv_insn_ext_v),) \
+	$(riscv_insn_ext_zvfofp4min) \
+	$(riscv_insn_ext_zvfofp8min) \
 	$(riscv_insn_ext_bf16) \
 	$(riscv_insn_ext_cmo) \
 	$(riscv_insn_ext_d_zfa) \
@@ -1575,9 +1606,12 @@ riscv_insn_list = \
 	$(riscv_insn_ext_zfh_zfa) \
 	$(riscv_insn_ext_zicond) \
 	$(riscv_insn_ext_zvk) \
+	$(riscv_insn_ext_zvbdot) \
+	$(riscv_insn_ext_zvldot) \
 	$(riscv_insn_priv) \
 	$(riscv_insn_smrnmi) \
 	$(riscv_insn_svinval) \
+	$(riscv_insn_ext_zibi) \
 	$(riscv_insn_ext_zimop) \
 	$(riscv_insn_ext_zcmop) \
 	$(riscv_insn_ext_zicfilp) \

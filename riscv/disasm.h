@@ -17,6 +17,7 @@ extern const char* vr_name[NVPR];
 extern const char* ur_name[NUPR]; // UVE vector registers
 extern const char* pr_name[NPR];  // UVE predicate registers
 extern const char* csr_name(int which);
+extern const char* frm_name(int which);
 
 class arg_t
 {

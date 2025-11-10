@@ -6,6 +6,7 @@
 #include "simif.h"
 #include "processor.h"
 #include "decode_macros.h"
+#include "platform.h"
 
 mmu_t::mmu_t(simif_t* sim, endianness_t endianness, processor_t* proc, reg_t cache_blocksz)
  : sim(sim), proc(proc), blocksz(cache_blocksz),
@@ -48,6 +49,16 @@ void throw_access_exception(bool virt, reg_t addr, access_type type)
     case FETCH: throw trap_instruction_access_fault(virt, addr, 0, 0);
     case LOAD: throw trap_load_access_fault(virt, addr, 0, 0);
     case STORE: throw trap_store_access_fault(virt, addr, 0, 0);
+    default: abort();
+  }
+}
+
+[[noreturn]] void throw_page_fault_exception(bool virt, reg_t addr, access_type type)
+{
+  switch (type) {
+    case FETCH: throw trap_instruction_page_fault(virt, addr, 0, 0);
+    case LOAD: throw trap_load_page_fault(virt, addr, 0, 0);
+    case STORE: throw trap_store_page_fault(virt, addr, 0, 0);
     default: abort();
   }
 }
@@ -101,6 +112,14 @@ mmu_t::insn_parcel_t mmu_t::fetch_slow_path(reg_t vaddr)
     paddr = translate(access_info, sizeof(insn_parcel_t));
     host_addr = (uintptr_t)sim->addr_to_mem(paddr);
 
+    if (proc->extension_enabled(EXT_ZICCID)) {
+      // Maintain exclusion with all store TLBs
+      for (auto [_, p2] : sim->get_harts())
+        p2->mmu->flush_stlb_ppn(paddr >> PGSHIFT);
+
+      tlb_insn_reverse_tags.insert(paddr >> PGSHIFT);
+    }
+
     refill_tlb(vaddr, paddr, (char*)host_addr, FETCH);
   }
 
@@ -140,8 +159,8 @@ reg_t reg_from_bytes(size_t len, const uint8_t* bytes)
 bool mmu_t::mmio_ok(reg_t paddr, access_type UNUSED type)
 {
   // Disallow access to debug region when not in debug mode
-  static_assert(DEBUG_START == 0);
-  if (/* paddr >= DEBUG_START && */ paddr <= DEBUG_END && proc && !proc->state.debug_mode)
+  reg_t debug_start = DEBUG_START; // suppress -Wtype-limits
+  if (paddr >= debug_start && paddr - debug_start < DEBUG_SIZE && proc && !proc->state.debug_mode)
     return false;
 
   return true;
@@ -315,6 +334,14 @@ void mmu_t::store_slow_path_intrapage(reg_t len, const uint8_t* bytes, mem_acces
     paddr = translate(access_info, len);
     host_addr = (uintptr_t)sim->addr_to_mem(paddr);
 
+    if (proc && proc->extension_enabled(EXT_ZICCID)) {
+      // Maintain exclusion with all instruction TLBs
+      for (auto [_, p2] : sim->get_harts())
+        p2->mmu->flush_itlb_ppn(paddr >> PGSHIFT);
+
+      tlb_store_reverse_tags.insert(paddr >> PGSHIFT);
+    }
+
     if (!access_info.flags.is_special_access())
       refill_tlb(vaddr, paddr, (char*)host_addr, STORE);
   }
@@ -369,8 +396,47 @@ void mmu_t::store_slow_path(reg_t original_addr, reg_t len, const uint8_t* bytes
     store_slow_path_intrapage(len, bytes, access_info, actually_store);
   }
 
-  if (actually_store && proc && unlikely(proc->get_log_commits_enabled()))
-    proc->state.log_mem_write.push_back(std::make_tuple(original_addr, reg_from_bytes(len, bytes), len));
+  if (actually_store && proc && unlikely(proc->get_log_commits_enabled())) {
+    // amocas.q sends len == 16, reg_from_bytes only supports up to 8
+    // bytes per conversion.  Make multiple entries in the log
+    reg_t offset = 0;
+    const auto reg_size = sizeof(reg_t);
+    while (unlikely(len > reg_size)) {
+      proc->state.log_mem_write.push_back(std::make_tuple(original_addr + offset, reg_from_bytes(reg_size, bytes + offset), reg_size));
+      offset += reg_size;
+      len -= reg_size;
+    }
+    proc->state.log_mem_write.push_back(std::make_tuple(original_addr + offset, reg_from_bytes(len, bytes + offset), len));
+  }
+}
+
+bool mmu_t::flush_tlb_ppn(reg_t ppn, dtlb_entry_t* tlb, reverse_tags_t& filter)
+{
+  if (!filter.contains(ppn))
+    return false;
+
+  filter.clear();
+
+  for (size_t i = 0; i < TLB_ENTRIES; i++) {
+    auto entry_ppn = tlb[i].data.target_addr >> PGSHIFT;
+    if (entry_ppn == ppn)
+      tlb[i].tag = -1;
+    else if (tlb[i].tag != (reg_t)-1)
+      filter.insert(entry_ppn);
+  }
+
+  return true;
+}
+
+void mmu_t::flush_stlb_ppn(reg_t ppn)
+{
+  flush_tlb_ppn(ppn, tlb_store, tlb_store_reverse_tags);
+}
+
+void mmu_t::flush_itlb_ppn(reg_t ppn)
+{
+  if (flush_tlb_ppn(ppn, tlb_insn, tlb_insn_reverse_tags))
+    flush_icache();
 }
 
 tlb_entry_t mmu_t::refill_tlb(reg_t vaddr, reg_t paddr, char* host_addr, access_type type)
@@ -523,7 +589,7 @@ reg_t mmu_t::s2xlate(reg_t gva, reg_t gpa, access_type type, access_type trap_ty
         if ((pte & ad) != ad) {
           if (hade) {
             // set accessed and possibly dirty bits
-            pte_store(pte_paddr, pte | ad, gva, virt, type, vm.ptesize);
+            pte_store(pte_paddr, pte | ad, gva, virt, trap_type, vm.ptesize);
           } else {
             // take exception if access or possibly dirty bit is not set.
             break;
@@ -549,6 +615,28 @@ reg_t mmu_t::s2xlate(reg_t gva, reg_t gpa, access_type type, access_type trap_ty
   }
 }
 
+bool mmu_t::check_svukte_qualified(reg_t addr, reg_t mode, bool forced_virt)
+{
+  state_t* state = proc->get_state();
+
+  if (mode != PRV_U)
+    return true;
+
+  if (proc->extension_enabled('S') && get_field(state->senvcfg->read(), SENVCFG_UKTE)) {
+    if (forced_virt && state->prv == PRV_U) {
+      bool hstatus_hukte = proc->extension_enabled('H') && (get_field(state->hstatus->read(), HSTATUS_HUKTE) == 1);
+      return !hstatus_hukte;
+    }
+
+    assert(proc->get_xlen() == 64);
+    if ((addr >> 63) & 1) {
+      return (state->v || forced_virt) && ((state->vsatp->read() & SATP64_MODE) == 0);
+    }
+  }
+
+  return true;
+}
+
 reg_t mmu_t::walk(mem_access_info_t access_info)
 {
   access_type type = access_info.type;
@@ -570,6 +658,10 @@ reg_t mmu_t::walk(mem_access_info_t access_info)
 
   if (vm.levels == 0)
     return s2xlate(addr, addr & ((reg_t(2) << (proc->xlen-1))-1), type, type, virt, hlvx, false) & ~page_mask; // zero-extend from xlen
+
+  if (proc->extension_enabled(EXT_SVUKTE) && !check_svukte_qualified(addr, mode, access_info.flags.forced_virt)) {
+    throw_page_fault_exception(virt, addr, type);
+  }
 
   bool s_mode = mode == PRV_S;
   bool sum = proc->state.sstatus->readvirt(virt) & MSTATUS_SUM;
@@ -661,12 +753,7 @@ reg_t mmu_t::walk(mem_access_info_t access_info)
     }
   }
 
-  switch (type) {
-    case FETCH: throw trap_instruction_page_fault(virt, addr, 0, 0);
-    case LOAD: throw trap_load_page_fault(virt, addr, 0, 0);
-    case STORE: throw trap_store_page_fault(virt, addr, 0, 0);
-    default: abort();
-  }
+  throw_page_fault_exception(virt, addr, type);
 }
 
 void mmu_t::register_memtracer(memtracer_t* t)

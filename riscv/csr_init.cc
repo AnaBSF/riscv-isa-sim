@@ -281,7 +281,14 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   auto hcontext = std::make_shared<masked_csr_t>(proc, CSR_HCONTEXT, (reg_t(1) << hcontext_length) - 1, 0);
   add_hypervisor_csr(CSR_HCONTEXT, hcontext);
   add_csr(CSR_MCONTEXT, mcontext = std::make_shared<proxy_csr_t>(proc, CSR_MCONTEXT, hcontext));
-  add_csr(CSR_MSECCFG, mseccfg = std::make_shared<mseccfg_csr_t>(proc, CSR_MSECCFG));
+
+  mseccfg = std::make_shared<mseccfg_csr_t>(proc, CSR_MSECCFG);
+  if (xlen == 32) {
+    add_csr(CSR_MSECCFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MSECCFG, mseccfg));
+    add_csr(CSR_MSECCFGH, mseccfgh = std::make_shared<rv32_high_csr_t>(proc, CSR_MSECCFGH, mseccfg));
+  } else {
+    add_csr(CSR_MSECCFG, mseccfg);
+  }
 
   for (int i = 0; i < max_pmp; ++i) {
     add_csr(CSR_PMPADDR0 + i, pmpaddr[i] = std::make_shared<pmpaddr_csr_t>(proc, CSR_PMPADDR0 + i));
@@ -312,7 +319,7 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
                             (proc->extension_enabled(EXT_ZICFILP) ? MENVCFG_LPE : 0) |
                             (proc->extension_enabled(EXT_ZICFISS) ? MENVCFG_SSE : 0) |
                             (proc->extension_enabled(EXT_SSDBLTRP) ? MENVCFG_DTE : 0)|
-                            (proc->extension_enabled(EXT_SMCSRIND) ? MENVCFG_CDE : 0);
+                            (proc->extension_enabled(EXT_SMCDELEG) ? MENVCFG_CDE : 0);
   menvcfg = std::make_shared<envcfg_csr_t>(proc, CSR_MENVCFG, menvcfg_mask, 0);
   if (xlen == 32) {
     add_user_csr(CSR_MENVCFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MENVCFG, menvcfg));
@@ -322,6 +329,7 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   }
   const reg_t senvcfg_mask = (proc->extension_enabled(EXT_ZICBOM) ? SENVCFG_CBCFE | SENVCFG_CBIE : 0) |
                             (proc->extension_enabled(EXT_ZICBOZ) ? SENVCFG_CBZE : 0) |
+                            (proc->extension_enabled(EXT_SVUKTE) ? SENVCFG_UKTE : 0) |
                             (proc->extension_enabled(EXT_SSNPM) ? SENVCFG_PMM : 0) |
                             (proc->extension_enabled(EXT_ZICFILP) ? SENVCFG_LPE : 0) |
                             (proc->extension_enabled(EXT_ZICFISS) ? SENVCFG_SSE : 0);
@@ -430,6 +438,17 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
     auto sireg = std::make_shared<sscsrind_reg_csr_t>(proc, CSR_SIREG, siselect);
     add_ireg_proxy(proc, sireg);
     add_supervisor_csr(CSR_SIREG, std::make_shared<virtualized_indirect_csr_t>(proc, sireg, vsireg));
+    if (proc->extension_enabled(EXT_SSCCFG) || proc->extension_enabled(EXT_SMCDELEG)) {
+      // case CSR_SIREG
+      if (proc->extension_enabled_const(EXT_ZICNTR)) {
+        sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, mcycle);
+        sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, minstret);
+      }
+      if (proc->extension_enabled_const(EXT_ZIHPM)) {
+        for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3 + 1); j++)
+          sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMCOUNTER_3 + j, csrmap[CSR_HPMCOUNTER3 + j]);
+      }
+    }
 
     const reg_t vsireg_csrs[] = { CSR_VSIREG2, CSR_VSIREG3, CSR_VSIREG4, CSR_VSIREG5, CSR_VSIREG6 };
     const reg_t sireg_csrs[] = { CSR_SIREG2, CSR_SIREG3, CSR_SIREG4, CSR_SIREG5, CSR_SIREG6 };
@@ -443,16 +462,6 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
       // Smcdeleg
       if (proc->extension_enabled(EXT_SSCCFG) || proc->extension_enabled(EXT_SMCDELEG)) {
         switch (sireg_csrs[i]) {
-          case CSR_SIREG:
-            if (proc->extension_enabled_const(EXT_ZICNTR)) {
-              sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, mcycle);
-              sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, minstret);
-            }
-            if (proc->extension_enabled_const(EXT_ZIHPM)) {
-              for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3 + 1); j++)
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMCOUNTER_3 + j, csrmap[CSR_HPMCOUNTER3 + j]);
-            }
-            break;
           case CSR_SIREG4:
           if (xlen == 32) {
             if (proc->extension_enabled_const(EXT_ZICNTR)) {

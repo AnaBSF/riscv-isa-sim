@@ -468,6 +468,7 @@ class medeleg_csr_t: public basic_csr_t {
   virtual bool unlogged_write(const reg_t val) noexcept override;
  private:
   const reg_t hypervisor_exceptions;
+  const reg_t mmu_exceptions;
 };
 
 class sip_csr_t: public mip_proxy_csr_t {
@@ -725,6 +726,7 @@ class dcsr_csr_t: public csr_t {
   bool ebreakvs;
   bool ebreakvu;
   bool v;
+  bool mprven;
   uint8_t cause;
   uint8_t ext_cause;
   bool cetrig;
@@ -973,7 +975,7 @@ class inaccessible_csr_t: public csr_t {
   virtual void verify_permissions(insn_t insn, bool write) const override;
   reg_t read() const noexcept override { return 0; }
  protected:
-  bool unlogged_write(const reg_t val) noexcept override { return false; }
+  bool unlogged_write(const reg_t UNUSED val) noexcept override { return false; }
 };
 
 class vstopi_csr_t: public csr_t {

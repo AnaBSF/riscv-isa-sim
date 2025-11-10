@@ -156,6 +156,7 @@ public:
   uint64_t p_imm5() { return x(20, 5); }
   uint64_t p_imm6() { return x(20, 6); }
 
+<<<<<<< HEAD
   /*=== UVE ===*/
   uint64_t uve_rd() { return x(7, 5); }
   int64_t uve_rs1() { return x(15, 5); }
@@ -182,6 +183,9 @@ public:
   int64_t uve_pred_rs1() { return x(15, 4); } // Source: predicate register
   int64_t uve_pred_vs1() { return x(15, 5); } // Source: vector register
   int64_t uve_pred_rs2() { return x(20, 5); }
+=======
+  uint64_t b_imm5() { return (x(20, 5) == 0) ? -1ul : x(20, 5); }
+>>>>>>> master
 
   uint64_t zcmp_regmask() {
     unsigned mask = 0;
@@ -273,8 +277,5 @@ private:
 
 #define set_field(reg, mask, val) \
   (((reg) & ~(std::remove_cv<decltype(reg)>::type)(mask)) | (((std::remove_cv<decltype(reg)>::type)(val) * ((mask) & ~((mask) << 1))) & (std::remove_cv<decltype(reg)>::type)(mask)))
-
-#define DEBUG_START             0x0
-#define DEBUG_END               (0x1000 - 1)
 
 #endif
