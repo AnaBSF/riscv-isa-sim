@@ -123,6 +123,12 @@ struct : public arg_t {
 
 struct : public arg_t {
   std::string to_string(insn_t insn) const {
+    return frm_name(insn.rm());
+  }
+} rm;
+
+struct : public arg_t {
+  std::string to_string(insn_t insn) const {
     return fpr_name[insn.rd()];
   }
 } frd;
@@ -562,6 +568,12 @@ struct : public arg_t {
 
 struct : public arg_t {
   std::string to_string(insn_t insn) const {
+    return std::to_string((int)insn.b_imm5());
+  }
+} b_imm5;
+
+struct : public arg_t {
+  std::string to_string(insn_t insn) const {
     return std::to_string((int)insn.bs());
   }
 } bs;
@@ -637,7 +649,17 @@ static void NOINLINE add_fstore_insn(disassembler_t* d, const char* name, uint32
 
 static void NOINLINE add_xamo_insn(disassembler_t* d, const char* name, uint32_t match, uint32_t mask)
 {
-  d->add_insn(new disasm_insn_t(name, match, mask, {&xrd, &xrs2, &base_only_address}));
+  const char *suffix[] = {"", ".rl", ".aq", ".aqrl"};
+  char new_name[128];
+  uint32_t new_mask = mask | (0x3 << 25);
+  uint32_t new_match;
+
+  for (uint32_t idx = 0; idx < sizeof(suffix) / sizeof(suffix[0]); ++idx) {
+    snprintf(new_name, sizeof(new_name), "%s%s", name, suffix[idx]);
+    new_match = match | (idx << 25);
+
+    d->add_insn(new disasm_insn_t(new_name, new_match, new_mask, {&xrd, &xrs2, &base_only_address}));
+  }
 }
 
 static void NOINLINE add_xlr_insn(disassembler_t* d, const char* name, uint32_t match, uint32_t mask)
@@ -653,6 +675,11 @@ static void NOINLINE add_xst_insn(disassembler_t* d, const char* name, uint32_t 
 static void NOINLINE add_btype_insn(disassembler_t* d, const char* name, uint32_t match, uint32_t mask)
 {
   d->add_insn(new disasm_insn_t(name, match, mask, {&xrs1, &xrs2, &branch_target}));
+}
+
+static void NOINLINE add_bimmtype_insn(disassembler_t* d, const char* name, uint32_t match, uint32_t mask)
+{
+  d->add_insn(new disasm_insn_t(name, match, mask, {&xrs1, &b_imm5, &branch_target}));
 }
 
 static void NOINLINE add_b1type_insn(disassembler_t* d, const char* name, uint32_t match, uint32_t mask)
@@ -694,6 +721,11 @@ static void NOINLINE add_xf2type_insn(disassembler_t* d, const char* name, uint3
 static void NOINLINE add_fx2type_insn(disassembler_t* d, const char* name, uint32_t match, uint32_t mask)
 {
   d->add_insn(new disasm_insn_t(name, match, mask, {&xrd, &frs1, &frs2}));
+}
+
+static void NOINLINE add_fxrtype_insn(disassembler_t* d, const char* name, uint32_t match, uint32_t mask)
+{
+  d->add_insn(new disasm_insn_t(name, match, mask, {&xrd, &frs1, &rm}));
 }
 
 static void NOINLINE add_flitype_insn(disassembler_t* d, const char* name, uint32_t match, uint32_t mask)
@@ -833,6 +865,7 @@ void disassembler_t::add_instructions(const isa_parser_t* isa, bool strict)
   #define DEFINE_PREFETCH(code) DISASM_INSN(#code, code, 0, {&store_address})
   #define DEFINE_LTYPE(code) DISASM_INSN(#code, code, 0, {&xrd, &bigimm})
   #define DEFINE_BTYPE(code) add_btype_insn(this, #code, match_##code, mask_##code);
+  #define DEFINE_BIMMTYPE(code) add_bimmtype_insn(this, #code, match_##code, mask_##code);
   #define DEFINE_B1TYPE(name, code) add_b1type_insn(this, name, match_##code, mask_##code);
   #define DEFINE_XLOAD(code) add_xload_insn(this, #code, match_##code, mask_##code);
   #define DEFINE_XSTORE(code) add_xstore_insn(this, #code, match_##code, mask_##code);
@@ -846,6 +879,7 @@ void disassembler_t::add_instructions(const isa_parser_t* isa, bool strict)
   #define DEFINE_FR3TYPE(code) add_fr3type_insn(this, #code, match_##code, mask_##code);
   #define DEFINE_FXTYPE(code) add_fxtype_insn(this, #code, match_##code, mask_##code);
   #define DEFINE_FX2TYPE(code) add_fx2type_insn(this, #code, match_##code, mask_##code);
+  #define DEFINE_FXRTYPE(code) add_fxrtype_insn(this, #code, match_##code, mask_##code);
   #define DEFINE_FLITYPE(code) add_flitype_insn(this, #code, match_##code, mask_##code);
   #define DEFINE_XFTYPE(code) add_xftype_insn(this, #code, match_##code, mask_##code);
   #define DEFINE_XF2TYPE(code) add_xf2type_insn(this, #code, match_##code, mask_##code);
@@ -1260,6 +1294,7 @@ void disassembler_t::add_instructions(const isa_parser_t* isa, bool strict)
       DEFINE_FR1TYPE(froundnx_d);
       DEFINE_FX2TYPE(fleq_d);
       DEFINE_FX2TYPE(fltq_d);
+      DEFINE_FXRTYPE(fcvtmod_w_d);
 
       if (xlen_eq(32)) {
         DEFINE_XF2TYPE(fmvp_d_x);
@@ -1366,6 +1401,11 @@ void disassembler_t::add_instructions(const isa_parser_t* isa, bool strict)
     DEFINE_R1TYPE(fcvt_s_h);
     DEFINE_R1TYPE(fcvt_d_h);
     //DEFINE_R1TYPE(fcvt_q_h);
+  }
+
+  if (ext_enabled(EXT_ZIBI)) {
+     DEFINE_BIMMTYPE(beqi)
+     DEFINE_BIMMTYPE(bnei)
   }
 
   if (ext_enabled('Q')) {
@@ -1944,6 +1984,16 @@ void disassembler_t::add_instructions(const isa_parser_t* isa, bool strict)
     #undef DISASM_OPIV_S__INSN
     #undef DISASM_OPIV_W__INSN
     #undef DISASM_VFUNARY0_INSN
+  }
+
+  if (ext_enabled(EXT_ZVFOFP4MIN)) {
+    DEFINE_VECTOR_V(vfext_vf2);
+  }
+
+  if (ext_enabled(EXT_ZVFOFP8MIN)) {
+    DEFINE_VECTOR_V(vfncvt_f_f_q);
+    DEFINE_VECTOR_V(vfncvt_sat_f_f_q);
+    DEFINE_VECTOR_V(vfncvtbf16_sat_f_f_w);
   }
 
   if (ext_enabled(EXT_ZVFBFMIN)) {

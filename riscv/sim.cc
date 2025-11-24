@@ -88,7 +88,7 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
 
 #ifndef RISCV_ENABLE_DUAL_ENDIAN
   if (cfg->endianness != endianness_little) {
-    fputs("Big-endian support has not been prroperly enabled; "
+    fputs("Big-endian support has not been properly enabled; "
           "please rebuild the riscv-isa-sim project using "
           "\"configure --enable-dual-endian\".\n",
           stderr);
@@ -118,8 +118,8 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
   // particular, the default device tree configuration that you get without
   // setting the dtb_file argument has one.
   std::vector<device_factory_sargs_t> device_factories = {
-    {clint_factory, {}}, // clint must be element 0
-    {plic_factory, {}}, // plic must be element 1
+    {clint_factory, {}},
+    {plic_factory, {}},
     {ns16550_factory, {}}};
   device_factories.insert(device_factories.end(),
                           plugin_device_factories.begin(),
@@ -253,10 +253,15 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
       std::shared_ptr<abstract_device_t> dev_ptr(device);
       add_device(device_base, dev_ptr);
 
-      if (i == 0) // clint_factory
+      if (dynamic_cast<clint_t*>(&*dev_ptr)) {
+        assert(!clint);
         clint = std::static_pointer_cast<clint_t>(dev_ptr);
-      else if (i == 1) // plic_factory
+      }
+
+      if (dynamic_cast<plic_t*>(&*dev_ptr)) {
+        assert(!plic);
         plic = std::static_pointer_cast<plic_t>(dev_ptr);
+      }
     }
   }
 }
@@ -273,7 +278,7 @@ int sim_t::run()
   if (!debug && log)
     set_procs_debug(true);
 
-  htif_t::set_expected_xlen(harts[0]->get_isa().get_max_xlen());
+  htif_t::set_expected_xlen(harts.begin()->second->get_isa().get_max_xlen());
 
   // htif_t::run() will repeatedly call back into sim_t::idle(), each
   // invocation of which will advance target time
@@ -337,22 +342,16 @@ void sim_t::set_procs_debug(bool value)
     procs[i]->set_debug(value);
 }
 
-static bool paddr_ok(reg_t addr)
-{
-  static_assert(MAX_PADDR_BITS == 8 * sizeof(addr));
-  return true;
-}
-
 bool sim_t::mmio_load(reg_t paddr, size_t len, uint8_t* bytes)
 {
-  if (paddr + len < paddr || !paddr_ok(paddr + len - 1))
+  if (paddr + len < paddr)
     return false;
   return bus.load(paddr, len, bytes);
 }
 
 bool sim_t::mmio_store(reg_t paddr, size_t len, const uint8_t* bytes)
 {
-  if (paddr + len < paddr || !paddr_ok(paddr + len - 1))
+  if (paddr + len < paddr)
     return false;
   return bus.store(paddr, len, bytes);
 }
@@ -403,12 +402,20 @@ void sim_t::set_rom()
 }
 
 char* sim_t::addr_to_mem(reg_t paddr) {
-  if (!paddr_ok(paddr))
-    return NULL;
-  auto desc = bus.find_device(paddr >> PGSHIFT << PGSHIFT, PGSIZE);
-  if (auto mem = dynamic_cast<abstract_mem_t*>(desc.second))
-    return mem->contents(paddr - desc.first);
-  return NULL;
+  auto page_offset = paddr % PGSIZE;
+  auto page_addr = paddr - page_offset;
+
+  if (auto it = addr_to_mem_cache.find(page_addr); it != addr_to_mem_cache.end())
+    return it->second + page_offset;
+
+  auto desc = bus.find_device(page_addr, PGSIZE);
+  if (auto mem = dynamic_cast<abstract_mem_t*>(desc.second)) {
+    auto res = mem->contents(page_addr - desc.first);
+    addr_to_mem_cache.insert({page_addr, res});
+    return res + page_offset;
+  }
+
+  return nullptr;
 }
 
 const char* sim_t::get_symbol(uint64_t paddr)

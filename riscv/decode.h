@@ -154,6 +154,8 @@ public:
   uint64_t p_imm5() { return x(20, 5); }
   uint64_t p_imm6() { return x(20, 6); }
 
+  uint64_t b_imm5() { return (x(20, 5) == 0) ? -1ul : x(20, 5); }
+
   uint64_t zcmp_regmask() {
     unsigned mask = 0;
     uint64_t rlist = rvc_rlist();
@@ -244,8 +246,5 @@ private:
 
 #define set_field(reg, mask, val) \
   (((reg) & ~(std::remove_cv<decltype(reg)>::type)(mask)) | (((std::remove_cv<decltype(reg)>::type)(val) * ((mask) & ~((mask) << 1))) & (std::remove_cv<decltype(reg)>::type)(mask)))
-
-#define DEBUG_START             0x0
-#define DEBUG_END               (0x1000 - 1)
 
 #endif
