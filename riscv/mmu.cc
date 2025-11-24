@@ -39,6 +39,7 @@ void mmu_t::flush_tlb()
   memset(tlb_insn, -1, sizeof(tlb_insn));
   memset(tlb_load, -1, sizeof(tlb_load));
   memset(tlb_store, -1, sizeof(tlb_store));
+  memset(pte_cache, -1, sizeof(pte_cache));
 
   flush_icache();
 }
@@ -106,7 +107,9 @@ mmu_t::insn_parcel_t mmu_t::fetch_slow_path(reg_t vaddr)
 
   auto [tlb_hit, host_addr, paddr] = access_tlb(tlb_insn, vaddr, TLB_FLAGS);
   auto access_info = generate_access_info(vaddr, FETCH, {});
-  check_triggers(triggers::OPERATION_EXECUTE, vaddr, access_info.effective_virt);
+
+  if (check_triggers_fetch)
+    check_triggers(triggers::OPERATION_EXECUTE, vaddr, access_info.effective_virt);
 
   if (!tlb_hit) {
     paddr = translate(access_info, sizeof(insn_parcel_t));
@@ -125,7 +128,8 @@ mmu_t::insn_parcel_t mmu_t::fetch_slow_path(reg_t vaddr)
 
   auto res = perform_intrapage_fetch(vaddr, host_addr, paddr);
 
-  check_triggers(triggers::OPERATION_EXECUTE, vaddr, access_info.effective_virt, from_le(res));
+  if (check_triggers_fetch)
+    check_triggers(triggers::OPERATION_EXECUTE, vaddr, access_info.effective_virt, from_le(res));
 
   return res;
 }
@@ -248,16 +252,17 @@ void mmu_t::load_slow_path_intrapage(reg_t len, uint8_t* bytes, mem_access_info_
 {
   reg_t vaddr = access_info.vaddr;
   auto [tlb_hit, host_addr, paddr] = access_tlb(tlb_load, vaddr, TLB_FLAGS);
-  if (!tlb_hit || access_info.flags.is_special_access()) {
+  bool special = access_info.flags.is_special_access() && !access_info.flags.lr;
+  if (!tlb_hit || special) {
     paddr = translate(access_info, len);
     host_addr = (uintptr_t)sim->addr_to_mem(paddr);
 
-    if (!access_info.flags.is_special_access())
+    if (!special)
       refill_tlb(vaddr, paddr, (char*)host_addr, LOAD);
+  }
 
-    if (access_info.flags.lr && !sim->reservable(paddr)) {
-      throw trap_load_access_fault(access_info.effective_virt, access_info.transformed_vaddr, 0, 0);
-    }
+  if (access_info.flags.lr && !sim->reservable(paddr)) {
+    throw trap_load_access_fault(access_info.effective_virt, access_info.transformed_vaddr, 0, 0);
   }
 
   perform_intrapage_load(vaddr, host_addr, paddr, len, bytes, access_info.flags);
@@ -282,7 +287,9 @@ void mmu_t::load_slow_path(reg_t original_addr, reg_t len, uint8_t* bytes, xlate
 
   auto access_info = generate_access_info(original_addr, LOAD, xlate_flags);
   reg_t transformed_addr = access_info.transformed_vaddr;
-  check_triggers(triggers::OPERATION_LOAD, transformed_addr, access_info.effective_virt);
+
+  if (check_triggers_load)
+    check_triggers(triggers::OPERATION_LOAD, transformed_addr, access_info.effective_virt);
 
   if ((transformed_addr & (len - 1)) == 0) {
     load_slow_path_intrapage(len, bytes, access_info);
@@ -302,12 +309,14 @@ void mmu_t::load_slow_path(reg_t original_addr, reg_t len, uint8_t* bytes, xlate
     }
   }
 
-  while (len > sizeof(reg_t)) {
-    check_triggers(triggers::OPERATION_LOAD, transformed_addr, access_info.effective_virt, reg_from_bytes(sizeof(reg_t), bytes));
-    len -= sizeof(reg_t);
-    bytes += sizeof(reg_t);
+  if (check_triggers_load) {
+    while (len > sizeof(reg_t)) {
+        check_triggers(triggers::OPERATION_LOAD, transformed_addr, access_info.effective_virt, reg_from_bytes(sizeof(reg_t), bytes));
+      len -= sizeof(reg_t);
+      bytes += sizeof(reg_t);
+    }
+    check_triggers(triggers::OPERATION_LOAD, transformed_addr, access_info.effective_virt, reg_from_bytes(len, bytes));
   }
-  check_triggers(triggers::OPERATION_LOAD, transformed_addr, access_info.effective_virt, reg_from_bytes(len, bytes));
 
   if (proc && unlikely(proc->get_log_commits_enabled()))
     proc->state.log_mem_read.push_back(std::make_tuple(original_addr, 0, len));
@@ -367,7 +376,8 @@ void mmu_t::store_slow_path(reg_t original_addr, reg_t len, const uint8_t* bytes
 
   auto access_info = generate_access_info(original_addr, STORE, xlate_flags);
   reg_t transformed_addr = access_info.transformed_vaddr;
-  if (actually_store) {
+
+  if (actually_store && check_triggers_store) {
     reg_t trig_len = len;
     const uint8_t* trig_bytes = bytes;
     while (trig_len > sizeof(reg_t)) {
@@ -480,12 +490,15 @@ bool mmu_t::pmp_ok(reg_t addr, reg_t len, access_type type, reg_t mode, bool hlv
   if (!proc || proc->n_pmp == 0)
     return true;
 
+  reg_t gran = reg_t(1) << proc->lg_pmp_granularity;
+  auto first_addr_aligned = addr & -gran;
+  auto last_addr_aligned = (addr + len - 1) & -gran;
+
   for (size_t i = 0; i < proc->n_pmp; i++) {
-    // Check each 4-byte sector of the access
+    // Check each PMP-granularity sector of the access
     bool any_match = false;
     bool all_match = true;
-    for (reg_t offset = 0; offset < len; offset += 1 << PMP_SHIFT) {
-      reg_t cur_addr = addr + offset;
+    for (reg_t cur_addr = first_addr_aligned; cur_addr <= last_addr_aligned; cur_addr += gran) {
       bool match = proc->state.pmpaddr[i]->match4(cur_addr);
       any_match |= match;
       all_match &= match;
@@ -560,6 +573,8 @@ reg_t mmu_t::s2xlate(reg_t gva, reg_t gpa, access_type type, access_type trap_ty
       int napot_bits = ((pte & PTE_N) ? (ctz(ppn) + 1) : 0);
 
       if (pte & PTE_RSVD) {
+        break;
+      } else if (!proc->extension_enabled(EXT_SVRSW60T59B) && (pte & PTE_SVRSW60T59B)) {
         break;
       } else if (!proc->extension_enabled(EXT_SVNAPOT) && (pte & PTE_N)) {
         break;
@@ -691,6 +706,8 @@ reg_t mmu_t::walk(mem_access_info_t access_info)
 
     if (pte & PTE_RSVD) {
       break;
+    } else if (!proc->extension_enabled(EXT_SVRSW60T59B) && (pte & PTE_SVRSW60T59B)) {
+        break;
     } else if (!proc->extension_enabled(EXT_SVNAPOT) && (pte & PTE_N)) {
       break;
     } else if (!pbmte && (pte & PTE_PBMT)) {

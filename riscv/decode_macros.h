@@ -225,7 +225,8 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
 #define zext_xlen(x) zext(x, xlen)
 
 #define set_pc(x) \
-  do { p->check_pc_alignment(x); \
+  do { if (unlikely((x) & ~p->pc_alignment_mask())) \
+        return p->throw_instruction_address_misaligned(x); \
        npc = sext_xlen(x); \
      } while (0)
 
@@ -374,3 +375,10 @@ inline long double to_f(float128_t f) { long double r; memcpy(&r, &f, sizeof(r))
 #define ZICFILP_IS_LP_EXPECTED(reg_num) \
   (((reg_num) != 1 && (reg_num) != 5 && (reg_num) != 7) ? \
    elp_t::LP_EXPECTED : elp_t::NO_LP_EXPECTED)
+#define maybe_set_elp(reg_num) \
+  if (unlikely(p->extension_enabled(EXT_ZICFILP))) { \
+    if (unlikely(ZICFILP_IS_LP_EXPECTED(reg_num) == elp_t::LP_EXPECTED)) { \
+      serialize(); \
+      return p->set_lpad_expected(npc); \
+    } \
+  }

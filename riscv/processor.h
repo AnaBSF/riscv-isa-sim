@@ -331,10 +331,7 @@ public:
     const int ialign = extension_enabled(EXT_ZCA) ? 16 : 32;
     return ~(reg_t)(ialign == 16 ? 0 : 2);
   }
-  void check_pc_alignment(reg_t pc) {
-    if (unlikely(pc & ~pc_alignment_mask()))
-      throw trap_instruction_address_misaligned(state.v, pc, 0, 0);
-  }
+  reg_t throw_instruction_address_misaligned(reg_t pc);
   reg_t legalize_privilege(reg_t);
   void set_privilege(reg_t, bool);
   const char* get_privilege_string() const;
@@ -379,6 +376,7 @@ public:
   bool is_waiting_for_interrupt() { return in_wfi; };
 
   void check_if_lpad_required();
+  reg_t set_lpad_expected(reg_t pc);
 
   reg_t select_an_interrupt_with_default_priority(reg_t enabled_interrupts) const;
 
