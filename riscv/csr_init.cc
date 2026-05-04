@@ -12,7 +12,7 @@ void state_t::add_csr(reg_t addr, const csr_t_p& csr)
 #define add_supervisor_csr(addr, csr) add_const_ext_csr('S', addr, csr)
 #define add_hypervisor_csr(addr, csr) add_ext_csr('H', addr, csr)
 
-void state_t::add_ireg_proxy(processor_t* const proc, sscsrind_reg_csr_t::sscsrind_reg_csr_t_p ireg)
+void state_t::add_iprio_proxy(processor_t* const proc, sscsrind_reg_csr_t::sscsrind_reg_csr_t_p ireg)
 {
   // This assumes xlen is always max_xlen, which is true today (see
   // mstatus_csr_t::unlogged_write()):
@@ -51,10 +51,8 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   add_csr(CSR_MTVEC, mtvec = std::make_shared<tvec_csr_t>(proc, CSR_MTVEC));
   add_csr(CSR_MCAUSE, mcause = std::make_shared<cause_csr_t>(proc, CSR_MCAUSE));
 
-  const reg_t minstretcfg_mask = !proc->extension_enabled_const(EXT_SMCNTRPMF) ? 0 :
-    MHPMEVENT_MINH | MHPMEVENT_SINH | MHPMEVENT_UINH | MHPMEVENT_VSINH | MHPMEVENT_VUINH;
-  auto minstretcfg = std::make_shared<smcntrpmf_csr_t>(proc, CSR_MINSTRETCFG, minstretcfg_mask, 0);
-  auto mcyclecfg = std::make_shared<smcntrpmf_csr_t>(proc, CSR_MCYCLECFG, minstretcfg_mask, 0);
+  minstretcfg = std::make_shared<smcntrpmf_csr_t>(proc, CSR_MINSTRETCFG);
+  mcyclecfg = std::make_shared<smcntrpmf_csr_t>(proc, CSR_MCYCLECFG);
 
   minstret = std::make_shared<wide_counter_csr_t>(proc, CSR_MINSTRET, minstretcfg);
   mcycle = std::make_shared<wide_counter_csr_t>(proc, CSR_MCYCLE, mcyclecfg);
@@ -79,6 +77,28 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   } else {
     add_csr(CSR_MINSTRET, minstret);
     add_csr(CSR_MCYCLE, mcycle);
+  }
+  if (proc->extension_enabled_const(EXT_SMCNTRPMF)) {
+    if (xlen == 32) {
+      add_csr(CSR_MCYCLECFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MCYCLECFG, mcyclecfg));
+      add_csr(CSR_MCYCLECFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MCYCLECFGH, mcyclecfg));
+      add_csr(CSR_MINSTRETCFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MINSTRETCFG, minstretcfg));
+      add_csr(CSR_MINSTRETCFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MINSTRETCFGH, minstretcfg));
+    } else {
+      add_csr(CSR_MCYCLECFG, mcyclecfg);
+      add_csr(CSR_MINSTRETCFG, minstretcfg);
+    }
+    if (proc->extension_enabled_const(EXT_SMCDELEG)) {
+      if (xlen == 32) {
+        cyclecfg = std::make_shared<counter_proxy_csr_t>(proc, CSR_MCYCLECFG, csrmap[CSR_MCYCLECFG]);
+        cyclecfgh = std::make_shared<counter_proxy_csr_t>(proc, CSR_MCYCLECFGH, csrmap[CSR_MCYCLECFGH]);
+        instretcfg = std::make_shared<counter_proxy_csr_t>(proc, CSR_MINSTRETCFG, csrmap[CSR_MINSTRETCFG]);
+        instretcfgh = std::make_shared<counter_proxy_csr_t>(proc, CSR_MINSTRETCFGH, csrmap[CSR_MINSTRETCFGH]);
+      } else {
+        instretcfg = std::make_shared<counter_proxy_csr_t>(proc, CSR_MINSTRETCFG, csrmap[CSR_MINSTRETCFG]);
+        cyclecfg = std::make_shared<counter_proxy_csr_t>(proc, CSR_MCYCLECFG, csrmap[CSR_MCYCLECFG]);
+      }
+    }
   }
   for (reg_t i = 0; i < N_HPMCOUNTERS; ++i) {
     const reg_t which_mevent = CSR_MHPMEVENT3 + i;
@@ -224,6 +244,25 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   } else {
     add_hypervisor_csr(CSR_HIDELEG, hideleg);
   }
+
+  const reg_t menvcfg_mask = (proc->extension_enabled(EXT_ZICBOM) ? MENVCFG_CBCFE | MENVCFG_CBIE : 0) |
+                            (proc->extension_enabled(EXT_ZICBOZ) ? MENVCFG_CBZE : 0) |
+                            (proc->extension_enabled(EXT_SMNPM) ? MENVCFG_PMM : 0) |
+                            (proc->extension_enabled(EXT_SVADU) ? MENVCFG_ADUE: 0) |
+                            (proc->extension_enabled(EXT_SVPBMT) ? MENVCFG_PBMTE : 0) |
+                            (proc->extension_enabled(EXT_SSTC) ? MENVCFG_STCE : 0) |
+                            (proc->extension_enabled(EXT_ZICFILP) ? MENVCFG_LPE : 0) |
+                            (proc->extension_enabled(EXT_ZICFISS) ? MENVCFG_SSE : 0) |
+                            (proc->extension_enabled(EXT_SSDBLTRP) ? MENVCFG_DTE : 0)|
+                            (proc->extension_enabled(EXT_SMCDELEG) ? MENVCFG_CDE : 0);
+  menvcfg = std::make_shared<envcfg_csr_t>(proc, CSR_MENVCFG, menvcfg_mask, 0);
+  if (xlen == 32) {
+    add_user_csr(CSR_MENVCFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MENVCFG, menvcfg));
+    add_user_csr(CSR_MENVCFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MENVCFGH, menvcfg));
+  } else {
+    add_user_csr(CSR_MENVCFG, menvcfg);
+  }
+
   const reg_t hedeleg_mask =
     (1 << CAUSE_MISALIGNED_FETCH) |
     (1 << CAUSE_FETCH_ACCESS) |
@@ -310,23 +349,6 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   add_csr(CSR_MVENDORID, std::make_shared<const_csr_t>(proc, CSR_MVENDORID, 0));
   add_csr(CSR_MHARTID, std::make_shared<const_csr_t>(proc, CSR_MHARTID, proc->get_id()));
   add_csr(CSR_MCONFIGPTR, std::make_shared<const_csr_t>(proc, CSR_MCONFIGPTR, 0));
-  const reg_t menvcfg_mask = (proc->extension_enabled(EXT_ZICBOM) ? MENVCFG_CBCFE | MENVCFG_CBIE : 0) |
-                            (proc->extension_enabled(EXT_ZICBOZ) ? MENVCFG_CBZE : 0) |
-                            (proc->extension_enabled(EXT_SMNPM) ? MENVCFG_PMM : 0) |
-                            (proc->extension_enabled(EXT_SVADU) ? MENVCFG_ADUE: 0) |
-                            (proc->extension_enabled(EXT_SVPBMT) ? MENVCFG_PBMTE : 0) |
-                            (proc->extension_enabled(EXT_SSTC) ? MENVCFG_STCE : 0) |
-                            (proc->extension_enabled(EXT_ZICFILP) ? MENVCFG_LPE : 0) |
-                            (proc->extension_enabled(EXT_ZICFISS) ? MENVCFG_SSE : 0) |
-                            (proc->extension_enabled(EXT_SSDBLTRP) ? MENVCFG_DTE : 0)|
-                            (proc->extension_enabled(EXT_SMCDELEG) ? MENVCFG_CDE : 0);
-  menvcfg = std::make_shared<envcfg_csr_t>(proc, CSR_MENVCFG, menvcfg_mask, 0);
-  if (xlen == 32) {
-    add_user_csr(CSR_MENVCFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MENVCFG, menvcfg));
-    add_user_csr(CSR_MENVCFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MENVCFGH, menvcfg));
-  } else {
-    add_user_csr(CSR_MENVCFG, menvcfg);
-  }
   const reg_t senvcfg_mask = (proc->extension_enabled(EXT_ZICBOM) ? SENVCFG_CBCFE | SENVCFG_CBIE : 0) |
                             (proc->extension_enabled(EXT_ZICBOZ) ? SENVCFG_CBZE : 0) |
                             (proc->extension_enabled(EXT_SVUKTE) ? SENVCFG_UKTE : 0) |
@@ -419,7 +441,8 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
 
     sscsrind_reg_csr_t::sscsrind_reg_csr_t_p mireg;
     add_csr(CSR_MIREG, mireg = std::make_shared<sscsrind_reg_csr_t>(proc, CSR_MIREG, miselect));
-    add_ireg_proxy(proc, mireg);
+    if (proc->extension_enabled_const(EXT_SMAIA))
+      add_iprio_proxy(proc, mireg);
     const reg_t mireg_csrs[] = { CSR_MIREG2, CSR_MIREG3, CSR_MIREG4, CSR_MIREG5, CSR_MIREG6 };
     for (auto csr : mireg_csrs)
       add_csr(csr, std::make_shared<sscsrind_reg_csr_t>(proc, csr, miselect));
@@ -436,16 +459,17 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
     add_hypervisor_csr(CSR_VSIREG, vsireg);
 
     auto sireg = std::make_shared<sscsrind_reg_csr_t>(proc, CSR_SIREG, siselect);
-    add_ireg_proxy(proc, sireg);
+    if (proc->extension_enabled_const(EXT_SSAIA))
+      add_iprio_proxy(proc, sireg);
     add_supervisor_csr(CSR_SIREG, std::make_shared<virtualized_indirect_csr_t>(proc, sireg, vsireg));
     if (proc->extension_enabled(EXT_SSCCFG) || proc->extension_enabled(EXT_SMCDELEG)) {
       // case CSR_SIREG
       if (proc->extension_enabled_const(EXT_ZICNTR)) {
-        sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, mcycle);
-        sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, minstret);
+        sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, csrmap[CSR_CYCLE]);
+        sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, csrmap[CSR_INSTRET]);
       }
       if (proc->extension_enabled_const(EXT_ZIHPM)) {
-        for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3 + 1); j++)
+        for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMCOUNTER_3 + 1); j++)
           sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMCOUNTER_3 + j, csrmap[CSR_HPMCOUNTER3 + j]);
       }
     }
@@ -469,30 +493,32 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
               sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, csrmap[CSR_INSTRETH]);
             }
             if (proc->extension_enabled_const(EXT_ZIHPM)) {
-              for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3 + 1); j++)
+              for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMCOUNTER_3 + 1); j++)
                 sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMCOUNTER_3 + j, csrmap[CSR_HPMCOUNTER3H + j]);
             }
           }
           break;
           case CSR_SIREG2:
             if (proc->extension_enabled_const(EXT_ZICNTR)) {
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, mcyclecfg);
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRETCFG, minstretcfg);
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, cyclecfg);
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRETCFG, instretcfg);
             }
             if (proc->extension_enabled_const(EXT_ZIHPM)) {
               for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3 + 1); j++)
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMEVENT_3 + j, csrmap[CSR_MHPMEVENT3H + j]);
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMEVENT_3 + j, csrmap[CSR_MHPMEVENT3 + j]);
             }
             break;
           case CSR_SIREG5:
             if (xlen == 32) {
-              if (proc->extension_enabled_const(EXT_ZICNTR)) {
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, mcycle);
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, minstret);
+              // cyclecfgh/instretcfgh
+              if (proc->extension_enabled_const(EXT_ZICNTR) && proc->extension_enabled_const(EXT_SMCNTRPMF)) {
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, cyclecfgh);
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, instretcfgh);
               }
-              if (proc->extension_enabled_const(EXT_ZIHPM)) {
+              // hpmevent3h-hpmevent31h
+              if (proc->extension_enabled_const(EXT_ZIHPM) && proc->extension_enabled_const(EXT_SSCOFPMF)) {
                 for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3); j++)
-                  sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMCOUNTER_3 + j, csrmap[CSR_HPMCOUNTER3 + j]);
+                  sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMEVENT_3 + j, csrmap[CSR_MHPMEVENT3H + j]);
               }
             }
           case CSR_SIREG3:
@@ -501,18 +527,6 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
             break;
         }
       }
-    }
-  }
-
-  if (proc->extension_enabled_const(EXT_SMCNTRPMF)) {
-    if (xlen == 32) {
-      add_csr(CSR_MCYCLECFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MCYCLECFG, mcyclecfg));
-      add_csr(CSR_MCYCLECFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MCYCLECFGH, mcyclecfg));
-      add_csr(CSR_MINSTRETCFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MINSTRETCFG, minstretcfg));
-      add_csr(CSR_MINSTRETCFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MINSTRETCFGH, minstretcfg));
-    } else {
-      add_csr(CSR_MCYCLECFG, mcyclecfg);
-      add_csr(CSR_MINSTRETCFG, minstretcfg);
     }
   }
 

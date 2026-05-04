@@ -20,6 +20,7 @@
 #include <limits>
 #include <cinttypes>
 #include <sstream>
+#include <map>
 #include "../VERSION"
 
 static void help(int exit_code = 1)
@@ -46,14 +47,15 @@ static void help(int exit_code = 1)
   fprintf(stderr, "  --pmpgranularity=<n>  PMP Granularity in bytes [default 4]\n");
   fprintf(stderr, "  --priv=<m|mu|msu>     RISC-V privilege modes supported [default %s]\n", DEFAULT_PRIV);
   fprintf(stderr, "  --pc=<address>        Override ELF entry point\n");
+  fprintf(stderr, "  --pcs=<H:A,...>       Override start PC for specific hart\n"); //This will bypass the built-in boot ROM
   fprintf(stderr, "  --hartids=<a,b,...>   Explicitly specify hartids, default is 0,1,...\n");
   fprintf(stderr, "  --ic=<S>:<W>:<B>      Instantiate a cache model with S sets,\n");
   fprintf(stderr, "  --dc=<S>:<W>:<B>        W ways, and B-byte blocks (with S and\n");
   fprintf(stderr, "  --l2=<S>:<W>:<B>        B both powers of 2).\n");
   fprintf(stderr, "  --big-endian          Use a big-endian memory system.\n");
-  fprintf(stderr, "  --misaligned          Support misaligned memory accesses\n");
   fprintf(stderr, "  --device=<name>       Attach MMIO plugin device from an --extlib library,\n");
   fprintf(stderr, "                          specify --device=<name>,<args> to pass down extra args.\n");
+  fprintf(stderr, "  --dtb-discovery       Enable direct device discovery from device tree blob. Requires --dtb and usage of special \"spike_plugin_params\" dts field.\n");
   fprintf(stderr, "  --log-cache-miss      Generate a log of cache miss\n");
   fprintf(stderr, "  --log-commits         Generate a log of commits info\n");
   fprintf(stderr, "  --extension=<name>    Specify RoCC Extension\n");
@@ -325,6 +327,8 @@ int main(int argc, char** argv)
   bool UNUSED socket = false;  // command line option -s
   bool dump_dts = false;
   bool dtb_enabled = true;
+  bool dtb_discovery = false;
+  bool memory_option = false;
   const char* kernel = NULL;
   reg_t kernel_offset, kernel_size;
   std::vector<device_factory_sargs_t> plugin_device_factories;
@@ -378,10 +382,27 @@ int main(int argc, char** argv)
   parser.option('s', 0, 0, [&](const char UNUSED *s){socket = true;});
 #endif
   parser.option('p', 0, 1, [&](const char* s){nprocs = atoul_nonzero_safe(s);});
-  parser.option('m', 0, 1, [&](const char* s){cfg.mem_layout = parse_mem_layout(s);});
+  parser.option('m', 0, 1, [&](const char* s){cfg.mem_layout = parse_mem_layout(s); memory_option=true; });
   parser.option(0, "halted", 0, [&](const char UNUSED *s){halted = true;});
   parser.option(0, "rbb-port", 1, [&](const char* s){use_rbb = true; rbb_port = atoul_safe(s);});
-  parser.option(0, "pc", 1, [&](const char* s){cfg.start_pc = strtoull(s, 0, 0);});
+  parser.option(0, "pc", 1, [&](const char* s){cfg.start_pc.set_global(strtoull(s, 0, 0));});
+
+  parser.option(0, "pcs", 1, [&](const char* s){
+    std::string arg(s);
+    std::stringstream ss(arg);
+    std::string pair;
+    while (std::getline(ss, pair, ',')) {
+      size_t delim = pair.find(':');
+      if (delim == std::string::npos) {
+        fprintf(stderr, "Error: --pcs format is hartid:addr,hartid:addr\n");
+        exit(1);
+      }
+      size_t hartid = std::strtoull(pair.substr(0, delim).c_str(), 0, 0);
+      reg_t addr = std::strtoull(pair.substr(delim+1).c_str(), 0, 0);
+      cfg.start_pc.set_override(hartid, addr);
+    }
+  });
+
   parser.option(0, "hartids", 1, [&](const char* s){
     cfg.hartids = parse_hartids(s);
     cfg.explicit_hartids = true;
@@ -390,13 +411,13 @@ int main(int argc, char** argv)
   parser.option(0, "dc", 1, [&](const char* s){dc.reset(new dcache_sim_t(s));});
   parser.option(0, "l2", 1, [&](const char* s){l2.reset(cache_sim_t::construct(s, "L2$"));});
   parser.option(0, "big-endian", 0, [&](const char UNUSED *s){cfg.endianness = endianness_big;});
-  parser.option(0, "misaligned", 0, [&](const char UNUSED *s){cfg.misaligned = true;});
   parser.option(0, "log-cache-miss", 0, [&](const char UNUSED *s){log_cache = true;});
   parser.option(0, "isa", 1, [&](const char* s){cfg.isa = s;});
   parser.option(0, "pmpregions", 1, [&](const char* s){cfg.pmpregions = atoul_safe(s);});
   parser.option(0, "pmpgranularity", 1, [&](const char* s){cfg.pmpgranularity = atoul_safe(s);});
   parser.option(0, "priv", 1, [&](const char* s){cfg.priv = s;});
   parser.option(0, "device", 1, device_parser);
+  parser.option(0, "dtb-discovery", 0, [&](const char UNUSED *s){ dtb_discovery = true;} );
   parser.option(0, "extension", 1, [&](const char* s){extensions.push_back(find_extension(s));});
   parser.option(0, "dump-dts", 0, [&](const char UNUSED *s){dump_dts = true;});
   parser.option(0, "disable-dtb", 0, [&](const char UNUSED *s){dtb_enabled = false;});
@@ -520,8 +541,16 @@ int main(int argc, char** argv)
     cfg.hartids = default_hartids;
   }
 
+  if (dtb_discovery){
+   if (memory_option) {   std::cerr << "--dtb-discovery option is not compatible with --memory/-m;."<<std::endl; exit(1);}
+   if (!plugin_device_factories.empty()) {   std::cerr << "--dtb-discovery option is not compatible with --device option."<<std::endl; exit(1);}
+   if (dtb_file==NULL) {    std::cerr << "--dtb-discovery option required a dtb_file. Use --dtb option."<<std::endl; exit(1);}
+   if (dtb_enabled==false) {    std::cerr << "--dtb-discovery option is not compatible with --disable-dtb"<<std::endl;  exit(1);}
+  }
+
+
   sim_t s(&cfg, halted,
-      mems, plugin_device_factories, htif_args, dm_config, log_path, dtb_enabled, dtb_file,
+      mems, plugin_device_factories, dtb_discovery, htif_args, dm_config, log_path, dtb_enabled, dtb_file,
       socket,
       cmd_file,
       instructions);

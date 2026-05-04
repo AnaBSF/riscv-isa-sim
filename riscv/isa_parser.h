@@ -22,6 +22,7 @@ typedef enum {
   EXT_ZCA,
   EXT_ZCB,
   EXT_ZCD,
+  EXT_ZCE,
   EXT_ZCF,
   EXT_ZCLSD,
   EXT_ZCMP,
@@ -60,10 +61,12 @@ typedef enum {
   EXT_ZICCID,
   EXT_ZICBOM,
   EXT_ZICBOZ,
+  EXT_ZICCLSM,
   EXT_ZICNTR,
   EXT_ZICOND,
   EXT_ZIHPM,
   EXT_ZILSD,
+  EXT_ZVABD,
   EXT_ZVBB,
   EXT_ZVKB,
   EXT_ZVBC,
@@ -85,12 +88,14 @@ typedef enum {
   EXT_ZVQLDOT16I,
   EXT_ZVFQLDOT8F,
   EXT_ZVFWLDOT16BF,
+  EXT_ZVZIP,
   EXT_SSTC,
   EXT_ZAAMO,
   EXT_ZALRSC,
   EXT_ZACAS,
   EXT_ZABHA,
   EXT_ZAWRS,
+  EXT_ZAMA16B,
   EXT_INTERNAL_ZFH_MOVE,
   EXT_SMCSRIND,
   EXT_SSCSRIND,
@@ -114,12 +119,6 @@ typedef enum {
 } isa_extension_t;
 
 typedef enum {
-  IMPL_MMU_SV32,
-  IMPL_MMU_SV39,
-  IMPL_MMU_SV48,
-  IMPL_MMU_SV57,
-  IMPL_MMU_SBARE,
-  IMPL_MMU,
   IMPL_MMU_VMID,
   IMPL_MMU_ASID,
 } impl_extension_t;
@@ -157,6 +156,10 @@ protected:
   std::bitset<NUM_ISA_EXTENSIONS> extension_table;
   std::string isa_string;
   std::set<std::string> extensions;
+
+private:
+  void add_extension(const std::string&, const char*);
+  void apply_zve_properties(const std::string&, const char*);
 };
 
 #endif

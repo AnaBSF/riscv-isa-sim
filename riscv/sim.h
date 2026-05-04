@@ -32,6 +32,7 @@ public:
   sim_t(const cfg_t *cfg, bool halted,
         std::vector<std::pair<reg_t, abstract_mem_t*>> mems,
         const std::vector<device_factory_sargs_t>& plugin_device_factories,
+        const bool dtb_discovery,
         const std::vector<std::string>& args,
         const debug_module_config_t &dm_config, const char *log_path,
         bool dtb_enabled, const char *dtb_file,
@@ -55,12 +56,13 @@ public:
   void set_remote_bitbang(remote_bitbang_t* remote_bitbang) {
     this->remote_bitbang = remote_bitbang;
   }
-  const char* get_dts() { return dts.c_str(); }
+  const char* get_dts();
   processor_t* get_core(size_t i) { return procs.at(i); }
   abstract_interrupt_controller_t* get_intctrl() const { assert(plic.get()); return plic.get(); }
   virtual const cfg_t &get_cfg() const override { return *cfg; }
 
   virtual const std::map<size_t, processor_t*>& get_harts() const override { return harts; }
+  const bus_t& get_bus() const {  return bus;}
 
   // Callback for processors to let the simulation know they were reset.
   virtual void proc_reset(unsigned id) override;
@@ -78,6 +80,7 @@ private:
   std::pair<reg_t, reg_t> initrd_range;
   std::string dts;
   std::string dtb;
+  bool dtb_discovery;
   bool dtb_enabled;
   std::vector<std::shared_ptr<abstract_device_t>> devices;
   std::shared_ptr<clint_t> clint;

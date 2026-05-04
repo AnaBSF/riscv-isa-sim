@@ -52,6 +52,23 @@
     WRITE_REG((reg) + 1, (sreg_t(val)) >> 32); \
   }
 
+// RVP macros
+#define WRITE_P_REG_PAIR(reg, value) \
+  if(reg != 0) { \
+    uint64_t val = (value); \
+    WRITE_REG(reg, sext32(val)); \
+    WRITE_REG((reg) + 1, (sreg_t(val)) >> 32); \
+  }
+
+#define P_READ_REG_PAIR(reg) ({ \
+  (reg) == 0 ? reg_t(0) : \
+  (READ_REG((reg) + 1) << 32) + zext32(READ_REG(reg)); })
+
+#define P_RS1_PAIR P_READ_REG_PAIR(insn.rs1_p())
+#define P_RS2_PAIR P_READ_REG_PAIR(insn.rs2_p())
+#define P_RD_PAIR P_READ_REG_PAIR(insn.rd_p())
+#define WRITE_P_RD_PAIR(value) WRITE_P_REG_PAIR(insn.rd_p(), value)
+
 // RVC macros
 #define WRITE_RVC_RS1S(value) WRITE_REG(insn.rvc_rs1s(), value)
 #define WRITE_RVC_RS2S(value) WRITE_REG(insn.rvc_rs2s(), value)
@@ -110,7 +127,6 @@
 #define FRS3_D READ_FREG_D(insn.rs3())
 #define dirty_fp_state  STATE.sstatus->dirty(SSTATUS_FS)
 #define dirty_ext_state STATE.sstatus->dirty(SSTATUS_XS)
-#define dirty_vs_state  STATE.sstatus->dirty(SSTATUS_VS)
 #define DO_WRITE_FREG(reg, value) (STATE.FPR.write(reg, value), dirty_fp_state)
 #define WRITE_FRD(value) WRITE_FREG(insn.rd(), value)
 #define WRITE_FRD_H(value) \
@@ -163,7 +179,6 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
 #define require_rv32 require(xlen == 32)
 #define require_extension(s) require(p->extension_enabled(s))
 #define require_either_extension(A,B) require(p->extension_enabled(A) || p->extension_enabled(B));
-#define require_impl(s) require(p->supports_impl(s))
 #define require_fp          STATE.fflags->verify_permissions(insn, false)
 #define require_accelerator require(STATE.sstatus->enabled(SSTATUS_XS))
 #define require_vector_vs   require(p->any_vector_extensions() && STATE.sstatus->enabled(SSTATUS_VS))
@@ -174,14 +189,12 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
     if (alu && !P.VU.vstart_alu) \
       require(P.VU.vstart->read() == 0); \
     WRITE_VSTATUS; \
-    dirty_vs_state; \
   } while (0);
 #define require_vector_novtype(is_log) \
   do { \
     require_vector_vs; \
     if (is_log) \
       WRITE_VSTATUS; \
-    dirty_vs_state; \
   } while (0);
 #define require_align(val, pos) require(is_aligned(val, pos))
 #define require_noover(astart, asize, bstart, bsize) \
@@ -223,6 +236,8 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
 #define zext(x, pos) (((reg_t)(x) << (64 - (pos))) >> (64 - (pos)))
 #define sext_xlen(x) sext(x, xlen)
 #define zext_xlen(x) zext(x, xlen)
+#define sext_xlen_pair(x) (xlen == 32 ? sext(x, 64) : (sreg_t)(x))
+#define zext_xlen_pair(x) (xlen == 32 ? zext(x, 64) : (reg_t)(x))
 
 #define set_pc(x) \
   do { if (unlikely((x) & ~p->pc_alignment_mask())) \

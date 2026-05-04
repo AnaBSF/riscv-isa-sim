@@ -63,25 +63,22 @@ processor_t::processor_t(const char* isa_str, const char* priv_str,
   VU.vlenb = isa.get_vlen() / 8;
   VU.vstart_alu = 0;
 
-  register_base_instructions();
   mmu = new mmu_t(sim, cfg->endianness, this, cfg->cache_blocksz);
-
-  disassembler = new disassembler_t(&isa);
-  for (auto e : isa.get_extensions())
-    register_extension(find_extension(e.c_str())());
 
   set_pmp_granularity(cfg->pmpgranularity);
   set_pmp_num(cfg->pmpregions);
 
-  if (isa.get_max_xlen() == 32)
-    set_mmu_capability(IMPL_MMU_SV32);
-  else if (isa.get_max_xlen() == 64)
-    set_mmu_capability(IMPL_MMU_SV57);
-
+  set_max_vaddr_bits(0);
   set_impl(IMPL_MMU_ASID, true);
   set_impl(IMPL_MMU_VMID, true);
 
   reset();
+
+  register_base_instructions();
+
+  disassembler = new disassembler_t(&isa);
+  for (auto e : isa.get_extensions())
+    register_extension(find_extension(e.c_str())());
 }
 
 processor_t::~processor_t()
@@ -147,6 +144,7 @@ void processor_t::enable_log_commits()
 {
   log_commits_enabled = true;
   mmu->flush_tlb(); // the TLB caches this setting
+  build_opcode_map();
 }
 
 void processor_t::reset()
@@ -216,31 +214,26 @@ void processor_t::set_pmp_granularity(reg_t gran)
   lg_pmp_granularity = ctz(gran);
 }
 
-void processor_t::set_mmu_capability(int cap)
+void processor_t::set_max_vaddr_bits(unsigned n)
 {
-  switch (cap) {
-    case IMPL_MMU_SV32:
-      set_impl(IMPL_MMU_SV32, true);
-      set_impl(IMPL_MMU, true);
+  switch (n) {
+    case 0:
       break;
-    case IMPL_MMU_SV57:
-      set_impl(IMPL_MMU_SV57, true);
-      [[fallthrough]];
-    case IMPL_MMU_SV48:
-      set_impl(IMPL_MMU_SV48, true);
-      [[fallthrough]];
-    case IMPL_MMU_SV39:
-      set_impl(IMPL_MMU_SV39, true);
-      set_impl(IMPL_MMU, true);
+    case 32:
+      if (isa.get_max_xlen() != 32)
+        abort();
+      break;
+    case 39:
+    case 48:
+    case 57:
+      if (isa.get_max_xlen() != 64)
+        abort();
       break;
     default:
-      set_impl(IMPL_MMU_SV32, false);
-      set_impl(IMPL_MMU_SV39, false);
-      set_impl(IMPL_MMU_SV48, false);
-      set_impl(IMPL_MMU_SV57, false);
-      set_impl(IMPL_MMU, false);
-      break;
+      abort();
   }
+
+  max_vaddr_bits = n;
 }
 
 reg_t processor_t::select_an_interrupt_with_default_priority(reg_t enabled_interrupts) const
@@ -505,8 +498,8 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
 
     reg_t s = state.mstatus->read();
     if ( extension_enabled(EXT_SMDBLTRP)) {
-      if (get_field(s, MSTATUS_MDT) || !nmie) {
-        // Critical error - Double trap in M-mode or trap when nmie is 0
+      if (get_field(s, MSTATUS_MDT) && (!state.mnstatus || !nmie)) {
+        // Critical error - Double trap in M-mode when Smrnmi not implemented or nmie is 0
         // RNMI is not modeled else double trap in M-mode would trap to
         // RNMI handler instead of leading to a critical error
         state.critical_error = 1;
@@ -663,47 +656,48 @@ reg_t processor_t::throw_instruction_address_misaligned(reg_t pc)
 
 insn_func_t processor_t::decode_insn(insn_t insn)
 {
-  if (!extension_enabled(EXT_ZCA) && insn_length(insn.bits()) % 4)
-    return &::illegal_instruction;
+  const auto& pool = opcode_map[insn.bits() % std::size(opcode_map)];
 
-  // look up opcode in hash table
-  size_t idx = insn.bits() % OPCODE_CACHE_SIZE;
-  auto [hit, desc] = opcode_cache[idx].lookup(insn.bits());
-
-  bool rve = extension_enabled('E');
-
-  if (unlikely(!hit)) {
-    // fall back to linear search
-    auto matching = [insn_bits = insn.bits()](const insn_desc_t &d) {
-      return (insn_bits & d.mask) == d.match;
-    };
-    auto p = std::find_if(custom_instructions.begin(),
-                          custom_instructions.end(), matching);
-    if (p == custom_instructions.end()) {
-      p = std::find_if(instructions.begin(), instructions.end(), matching);
-      assert(p != instructions.end());
+  for (auto p = pool.begin(); ; ++p) {
+    if ((insn.bits() & p->mask) == p->match) {
+      return p->func;
     }
-    desc = &*p;
-    opcode_cache[idx].replace(insn.bits(), desc);
   }
-
-  return desc->func(xlen, rve, log_commits_enabled);
 }
 
-void processor_t::register_insn(insn_desc_t desc, bool is_custom) {
+void processor_t::register_insn(insn_desc_t desc, std::vector<insn_desc_t>& pool) {
   assert(desc.fast_rv32i && desc.fast_rv64i && desc.fast_rv32e && desc.fast_rv64e &&
          desc.logged_rv32i && desc.logged_rv64i && desc.logged_rv32e && desc.logged_rv64e);
 
-  if (is_custom)
-    custom_instructions.push_back(desc);
-  else
-    instructions.push_back(desc);
+  pool.push_back(desc);
 }
 
 void processor_t::build_opcode_map()
 {
-  for (size_t i = 0; i < OPCODE_CACHE_SIZE; i++)
-    opcode_cache[i].reset();
+  bool rve = extension_enabled('E');
+  bool zca = extension_enabled(EXT_ZCA);
+  const size_t N = std::size(opcode_map);
+
+  auto build_one = [&](const insn_desc_t& desc) {
+    auto func = desc.func(xlen, rve, log_commits_enabled);
+    if (!zca && insn_length(desc.match) % 4)
+      func = &::illegal_instruction;
+
+    auto stride = std::min(N, size_t(1) << ctz(~desc.mask));
+    for (size_t i = desc.match & (stride - 1); i < N; i += stride) {
+      if ((desc.match % N) == (i & desc.mask))
+        opcode_map[i].push_back({desc.match, desc.mask, func});
+    }
+  };
+
+  for (auto& p : opcode_map)
+    p.clear();
+
+  for (auto& d : custom_instructions)
+    build_one(d);
+
+  for (auto& d : instructions)
+    build_one(d);
 }
 
 void processor_t::register_extension(extension_t *x) {
